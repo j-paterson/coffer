@@ -19,7 +19,8 @@ never leaves your machine.
 
 - [Bun](https://bun.sh) v1.1+
 - SQLite3
-- Python 3.12+ (optional — only for the legacy file-based parsers in `pipeline/`)
+- Python 3.12+ (optional — needed for the categorization + reconciliation
+  sidecar and the file-based parsers in `pipeline/`)
 
 ## Quick Start
 
@@ -46,6 +47,43 @@ run; you'll see an empty dashboard until you enable a parser and run a sync.
 
 Edit `finance.config.ts` to enable parsers and set walker options.
 API keys live in `.env`. See `.env.example` for the full list.
+
+## Categorization & sidecar (optional)
+
+Coffer ships with a Python sidecar in `pipeline/` that handles rule-based
+categorization, transfer reconciliation, price backfills, and a few
+file-based ingest paths (Chase PDF statements, Kubera CSV exports).
+Without it the dashboard still works, but every transaction stays in
+"Uncategorized" and the server's post-sync hooks log skipped steps.
+
+```bash
+# From the repo root
+python3.12 -m venv .venv
+.venv/bin/pip install -e ./pipeline
+
+# Copy and customize categorization rules
+cp pipeline/rules.example.yaml pipeline/rules.yaml
+# Edit pipeline/rules.yaml to add patterns for your merchants
+
+# Apply rules to uncategorized transactions
+.venv/bin/finance categorize --uncategorized
+```
+
+The dev server invokes `.venv/bin/finance` from the repo root after every
+sync, so the venv must live at that exact path or the post-sync hooks
+will be skipped.
+
+Useful sidecar commands:
+
+| Command | What it does |
+|---------|--------------|
+| `finance categorize --uncategorized` | Apply `pipeline/rules.yaml` to uncategorized txns |
+| `finance reconcile dedup` | Merge duplicate transactions across sources |
+| `finance reconcile transfers` | Link transfer counterparties between accounts |
+| `finance backfill prices` | Fill missing daily prices for assets you hold |
+| `finance ingest chase-statements --path <pdf>` | Parse a Chase monthly PDF |
+| `finance ingest kubera --path <csv>` | Import a Kubera asset CSV |
+| `finance --help` | Full subcommand list |
 
 ## Architecture
 
