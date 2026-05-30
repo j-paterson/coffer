@@ -112,19 +112,28 @@ describe("integration — ConfigParseError exits 2", () => {
   });
 });
 
-describe("integration — DB open failure", () => {
-  test("missing FINANCE_DB target exits 1 with 'cannot open database' on stderr", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "phase4-missing-db-"));
-    const path = join(dir, "does-not-exist.sqlite");
+describe("integration — DB bootstrap", () => {
+  test("missing FINANCE_DB target is auto-created with migrations applied", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "phase4-bootstrap-db-"));
+    const path = join(dir, "fresh.sqlite");
+    const configPath = join(dir, "config.ts");
+    writeFileSync(configPath, "export default { parsers: {} };\n");
     const proc = Bun.spawn({
-      cmd: ["bun", ENTRY, "sync", "coinbase",
-            "--config", "/tmp/does-not-exist-phase4.ts"],
+      cmd: ["bun", ENTRY, "sync", "coinbase", "--config", configPath],
       stdout: "pipe",
       stderr: "pipe",
       env: { ...process.env, FINANCE_DB: path },
     });
-    const [stderr, exitCode] = await Promise.all([readAll(proc.stderr), proc.exited]);
-    expect(exitCode).toBe(1);
-    expect(stderr).toContain("cannot open database");
+    const exitCode = await proc.exited;
+    expect(exitCode).toBe(0);
+    const db = new Database(path, { readonly: true });
+    try {
+      const rows = db.query<{ name: string }, []>(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'",
+      ).all();
+      expect(rows.length).toBe(1);
+    } finally {
+      db.close();
+    }
   });
 });

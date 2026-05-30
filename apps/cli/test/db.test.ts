@@ -1,5 +1,7 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { resolve } from "node:path";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { resolveDbPath, resolveCachePath, openProductionDb } from "../src/db";
 
@@ -39,14 +41,35 @@ describe("resolveCachePath", () => {
 
 describe("openProductionDb", () => {
   let saved: string | undefined;
-  beforeEach(() => { saved = process.env.FINANCE_DB; });
+  let tmpDir: string;
+
+  beforeEach(() => {
+    saved = process.env.FINANCE_DB;
+    tmpDir = mkdtempSync(join(tmpdir(), "coffer-db-"));
+  });
   afterEach(()  => {
     if (saved === undefined) delete process.env.FINANCE_DB;
     else process.env.FINANCE_DB = saved;
+    rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  test("throws when target file does not exist (create:false)", () => {
-    process.env.FINANCE_DB = "/tmp/does-not-exist-phase3.sqlite";
+  test("creates DB file and applies migrations when target doesn't exist", () => {
+    const path = join(tmpDir, "fresh.sqlite");
+    process.env.FINANCE_DB = path;
+    const db = openProductionDb();
+    try {
+      expect(existsSync(path)).toBe(true);
+      const rows = db.query<{ name: string }, []>(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'",
+      ).all();
+      expect(rows.length).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
+  test("throws when target directory does not exist", () => {
+    process.env.FINANCE_DB = "/nonexistent-coffer-test-dir/x.sqlite";
     expect(() => openProductionDb()).toThrow();
   });
 });

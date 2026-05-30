@@ -19,27 +19,28 @@ never leaves your machine.
 
 - [Bun](https://bun.sh) v1.1+
 - SQLite3
-- Python 3.12+ (only for the legacy file-based parsers and migration CLI)
+- Python 3.12+ (optional — only for the legacy file-based parsers in `pipeline/`)
 
 ## Quick Start
 
 ```bash
-git clone <repo-url>
-cd finance
+git clone https://github.com/j-paterson/coffer.git
+cd coffer
 bun install
 
 # Copy templates
 cp finance.config.ts.example finance.config.ts
 cp .env.example .env
 chmod 600 .env
-# Edit finance.config.ts to enable parsers
-# Edit .env to add your API keys
+# Edit finance.config.ts to enable parsers (optional — empty config still boots)
+# Edit .env to add API keys for the parsers you enabled
 
 # Start the dashboard
 bun run dev
 ```
 
-Open <http://localhost:5173>.
+Open <http://localhost:5173>. The database is created automatically on first
+run; you'll see an empty dashboard until you enable a parser and run a sync.
 
 ## Configuration
 
