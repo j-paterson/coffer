@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Finance Fixture",
+  "type": "object",
+  "required": ["name", "description", "as_of"],
+  "additionalProperties": false,
+  "properties": {
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "description": { "type": "string", "minLength": 1 },
+    "as_of": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "data_sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "kind", "trust_rank", "enabled"],
+        "additionalProperties": true,
+        "properties": {
+          "name": { "type": "string" },
+          "kind": { "enum": ["assertion", "snapshot"] },
+          "trust_rank": { "type": "integer", "minimum": 0 },
+          "enabled": { "enum": [0, 1] }
+        }
+      }
+    },
+    "accounts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type"],
+        "additionalProperties": true
+      }
+    },
+    "raw_events": { "type": "array", "items": { "type": "object" } },
+    "postings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["txn", "legs"],
+        "additionalProperties": false,
+        "properties": {
+          "txn": {
+            "type": "object",
+            "required": ["date", "derived_by"],
+            "additionalProperties": true
+          },
+          "legs": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "required": ["account_id", "amount"],
+              "additionalProperties": true
+            }
+          }
+        }
+      }
+    },
+    "balance_assertions": { "type": "array", "items": { "type": "object" } },
+    "positions": { "type": "array", "items": { "type": "object" } },
+    "position_snapshots": { "type": "array", "items": { "type": "object" } },
+    "asset_prices": { "type": "array", "items": { "type": "object" } }
+  }
+}

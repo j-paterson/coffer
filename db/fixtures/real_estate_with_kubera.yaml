@@ -1,0 +1,32 @@
+name: real_estate_with_kubera
+description: |
+  A household whose only signals are: one checking account synced via
+  SimpleFIN through 2026-04-17, and a real-estate account anchored by
+  manual TCAD assertions on 2024-08-31 ($559,560 purchase price) and
+  2026-01-01 ($578,365 TCAD-2026). No crypto, no recent activity past
+  the last simplefin sync.
+
+  Reproduces the real-estate-vanishing bug: walkV2 must forward-fill
+  the real-estate value past the last assertion through the scenario's
+  as_of (2026-04-27), not stop at 2026-01-01 or 2026-04-17.
+as_of: 2026-04-27
+
+accounts:
+  - id: simplefin:chk-1234
+    type: checking
+    institution: Chase
+    display_name: Chase Checking
+    mode: live
+    active: 1
+  - id: manual:property:los-ranchos-8401
+    type: alt
+    institution: Real Estate
+    display_name: 8401 Los Ranchos Dr
+    mode: manual
+    active: 1
+
+balance_assertions:
+  - { account_id: manual:property:los-ranchos-8401, as_of: 2024-08-30, expected_usd:      0, source: manual,    source_file: purchase-date }
+  - { account_id: manual:property:los-ranchos-8401, as_of: 2024-08-31, expected_usd: 559560, source: manual,    source_file: purchase-price }
+  - { account_id: manual:property:los-ranchos-8401, as_of: 2026-01-01, expected_usd: 578365, source: manual,    source_file: tcad-2026 }
+  - { account_id: simplefin:chk-1234,                as_of: 2026-04-17, expected_usd:  10234, source: simplefin, source_file: feed }

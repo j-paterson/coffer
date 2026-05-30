@@ -1,0 +1,378 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`coinbaseParser surface end-to-end Operation stream is stable (snapshot) 1`] = `
+[
+  {
+    "external_id": "coinbase:v3-account:v3-eth-uuid:2024-06-15",
+    "kind": "raw_event",
+    "payload": {
+      "available_balance": {
+        "currency": "ETH",
+        "value": "2.50",
+      },
+      "currency": "ETH",
+      "name": "ETH Wallet",
+      "type": "ACCOUNT_TYPE_CRYPTO",
+      "uuid": "v3-eth-uuid",
+    },
+    "source": "coinbase",
+  },
+  {
+    "external_id": "coinbase:v3-account:v3-btc-uuid:2024-06-15",
+    "kind": "raw_event",
+    "payload": {
+      "available_balance": {
+        "currency": "BTC",
+        "value": "0.10",
+      },
+      "currency": "BTC",
+      "name": "BTC Wallet",
+      "type": "ACCOUNT_TYPE_CRYPTO",
+      "uuid": "v3-btc-uuid",
+    },
+    "source": "coinbase",
+  },
+  {
+    "external_id": "coinbase:v2-account:v2-eth-uuid:2024-06-15",
+    "kind": "raw_event",
+    "payload": {
+      "currency": "ETH",
+      "id": "v2-eth-uuid",
+      "name": "ETH Wallet",
+    },
+    "source": "coinbase",
+  },
+  {
+    "external_id": "coinbase:v2-account:v2-btc-uuid:2024-06-15",
+    "kind": "raw_event",
+    "payload": {
+      "currency": "BTC",
+      "id": "v2-btc-uuid",
+      "name": "BTC Wallet",
+    },
+    "source": "coinbase",
+  },
+  {
+    "draft": {
+      "currency": "ETH",
+      "display_name": "ETH Wallet",
+      "external_id": "v3-eth-uuid",
+      "id": "coinbase:v3-eth-uuid",
+      "institution": "Coinbase",
+      "mode": "live",
+      "source": "coinbase",
+      "type": "brokerage",
+    },
+    "kind": "account_discovery",
+  },
+  {
+    "external_id": "coinbase:v2-txn:txn-eth-1",
+    "kind": "raw_event",
+    "payload": {
+      "amount": {
+        "amount": "1.0",
+        "currency": "ETH",
+      },
+      "created_at": "2024-06-10T10:00:00Z",
+      "id": "txn-eth-1",
+      "type": "buy",
+    },
+    "source": "coinbase",
+  },
+  {
+    "external_id": "coinbase:v2-txn:txn-eth-2",
+    "kind": "raw_event",
+    "payload": {
+      "amount": {
+        "amount": "0.75",
+        "currency": "ETH",
+      },
+      "created_at": "2024-06-11T10:00:00Z",
+      "id": "txn-eth-2",
+      "type": "buy",
+    },
+    "source": "coinbase",
+  },
+  {
+    "external_id": "coinbase:v2-txn:txn-eth-3",
+    "kind": "raw_event",
+    "payload": {
+      "amount": {
+        "amount": "-0.25",
+        "currency": "ETH",
+      },
+      "created_at": "2024-06-12T10:00:00Z",
+      "id": "txn-eth-3",
+      "type": "send",
+    },
+    "source": "coinbase",
+  },
+  {
+    "external_id": "coinbase:v2-txn:txn-eth-4",
+    "kind": "raw_event",
+    "payload": {
+      "amount": {
+        "amount": "0.50",
+        "currency": "ETH",
+      },
+      "created_at": "2024-06-13T10:00:00Z",
+      "id": "txn-eth-4",
+      "type": "buy",
+    },
+    "source": "coinbase",
+  },
+  {
+    "external_id": "coinbase:v2-txn:txn-eth-5",
+    "kind": "raw_event",
+    "payload": {
+      "amount": {
+        "amount": "0.50",
+        "currency": "ETH",
+      },
+      "created_at": "2024-06-14T10:00:00Z",
+      "id": "txn-eth-5",
+      "type": "buy",
+    },
+    "source": "coinbase",
+  },
+  {
+    "draft": {
+      "account_id": "coinbase:v3-eth-uuid",
+      "as_of": "2024-06-10",
+      "chain": "ethereum",
+      "contract_address": null,
+      "price_usd": 3000,
+      "qty": 1,
+      "source": "coinbase",
+      "symbol": "ETH",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "coinbase:v3-eth-uuid",
+      "as_of": "2024-06-11",
+      "chain": "ethereum",
+      "contract_address": null,
+      "price_usd": 3100,
+      "qty": 1.75,
+      "source": "coinbase",
+      "symbol": "ETH",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "coinbase:v3-eth-uuid",
+      "as_of": "2024-06-12",
+      "chain": "ethereum",
+      "contract_address": null,
+      "price_usd": 3200,
+      "qty": 1.5,
+      "source": "coinbase",
+      "symbol": "ETH",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "coinbase:v3-eth-uuid",
+      "as_of": "2024-06-13",
+      "chain": "ethereum",
+      "contract_address": null,
+      "price_usd": 3300,
+      "qty": 2,
+      "source": "coinbase",
+      "symbol": "ETH",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "coinbase:v3-eth-uuid",
+      "as_of": "2024-06-14",
+      "chain": "ethereum",
+      "contract_address": null,
+      "price_usd": 3400,
+      "qty": 2.5,
+      "source": "coinbase",
+      "symbol": "ETH",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "coinbase:v3-eth-uuid",
+      "as_of": "2024-06-15",
+      "chain": "ethereum",
+      "contract_address": null,
+      "price_usd": 3500,
+      "qty": 2.5,
+      "source": "coinbase",
+      "symbol": "ETH",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "currency": "BTC",
+      "display_name": "BTC Wallet",
+      "external_id": "v3-btc-uuid",
+      "id": "coinbase:v3-btc-uuid",
+      "institution": "Coinbase",
+      "mode": "live",
+      "source": "coinbase",
+      "type": "brokerage",
+    },
+    "kind": "account_discovery",
+  },
+  {
+    "external_id": "coinbase:v2-txn:txn-btc-1",
+    "kind": "raw_event",
+    "payload": {
+      "amount": {
+        "amount": "0.05",
+        "currency": "BTC",
+      },
+      "created_at": "2024-06-10T10:00:00Z",
+      "id": "txn-btc-1",
+      "type": "buy",
+    },
+    "source": "coinbase",
+  },
+  {
+    "external_id": "coinbase:v2-txn:txn-btc-2",
+    "kind": "raw_event",
+    "payload": {
+      "amount": {
+        "amount": "0.03",
+        "currency": "BTC",
+      },
+      "created_at": "2024-06-11T10:00:00Z",
+      "id": "txn-btc-2",
+      "type": "buy",
+    },
+    "source": "coinbase",
+  },
+  {
+    "external_id": "coinbase:v2-txn:txn-btc-3",
+    "kind": "raw_event",
+    "payload": {
+      "amount": {
+        "amount": "-0.02",
+        "currency": "BTC",
+      },
+      "created_at": "2024-06-12T10:00:00Z",
+      "id": "txn-btc-3",
+      "type": "send",
+    },
+    "source": "coinbase",
+  },
+  {
+    "external_id": "coinbase:v2-txn:txn-btc-4",
+    "kind": "raw_event",
+    "payload": {
+      "amount": {
+        "amount": "0.02",
+        "currency": "BTC",
+      },
+      "created_at": "2024-06-13T10:00:00Z",
+      "id": "txn-btc-4",
+      "type": "buy",
+    },
+    "source": "coinbase",
+  },
+  {
+    "external_id": "coinbase:v2-txn:txn-btc-5",
+    "kind": "raw_event",
+    "payload": {
+      "amount": {
+        "amount": "0.02",
+        "currency": "BTC",
+      },
+      "created_at": "2024-06-14T10:00:00Z",
+      "id": "txn-btc-5",
+      "type": "buy",
+    },
+    "source": "coinbase",
+  },
+  {
+    "draft": {
+      "account_id": "coinbase:v3-btc-uuid",
+      "as_of": "2024-06-10",
+      "chain": "bitcoin",
+      "contract_address": null,
+      "price_usd": 60000,
+      "qty": 0.05,
+      "source": "coinbase",
+      "symbol": "BTC",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "coinbase:v3-btc-uuid",
+      "as_of": "2024-06-11",
+      "chain": "bitcoin",
+      "contract_address": null,
+      "price_usd": 61000,
+      "qty": 0.08,
+      "source": "coinbase",
+      "symbol": "BTC",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "coinbase:v3-btc-uuid",
+      "as_of": "2024-06-12",
+      "chain": "bitcoin",
+      "contract_address": null,
+      "price_usd": 62000,
+      "qty": 0.06,
+      "source": "coinbase",
+      "symbol": "BTC",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "coinbase:v3-btc-uuid",
+      "as_of": "2024-06-13",
+      "chain": "bitcoin",
+      "contract_address": null,
+      "price_usd": 63000,
+      "qty": 0.08,
+      "source": "coinbase",
+      "symbol": "BTC",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "coinbase:v3-btc-uuid",
+      "as_of": "2024-06-14",
+      "chain": "bitcoin",
+      "contract_address": null,
+      "price_usd": 64000,
+      "qty": 0.1,
+      "source": "coinbase",
+      "symbol": "BTC",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "coinbase:v3-btc-uuid",
+      "as_of": "2024-06-15",
+      "chain": "bitcoin",
+      "contract_address": null,
+      "price_usd": 65000,
+      "qty": 0.1,
+      "source": "coinbase",
+      "symbol": "BTC",
+    },
+    "kind": "position_snapshot",
+  },
+]
+`;

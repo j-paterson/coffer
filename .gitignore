@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# Database and data
+db/finance.sqlite
+db/finance.sqlite-journal
+db/finance.sqlite-wal
+db/finance.sqlite-shm
+db/parser-cache.sqlite
+db/parser-cache.sqlite-journal
+db/parser-cache.sqlite-wal
+db/parser-cache.sqlite-shm
+backups/
+raw/
+
+# Node / Bun / Next
+node_modules/
+.next/
+out/
+dist/
+.turbo/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+.env.simplefin.raw
+
+# Google OAuth credentials for Gmail API (milestone 8b)
+.secrets/
+
+# Calibration logs (comparisons between runs), kept locally
+logs/
+
+# Internal Claude Code runtime state
+.claude/scheduled_tasks.lock
+
+# Superpowers brainstorming sessions
+.superpowers/
+
+# Git worktrees (isolated workspaces for feature branches)
+.worktrees/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# One-off diagnostic scripts
+scripts/debug_*.py
+
+# Auto-generated from wallet activity (re-derive with scripts/backfill/derive_blessed.ts)
+scripts/backfill/blessed_contracts.ts
+
+# Claude Code settings (personal paths; committed example: .claude/settings.example.json)
+.claude/settings.json
+
+# Personal categorization rules (committed: rules.example.yaml)
+pipeline/rules.yaml
+
+# User config (committed example: finance.config.ts.example)
+finance.config.ts

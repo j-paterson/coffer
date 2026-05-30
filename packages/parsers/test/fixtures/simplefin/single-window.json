@@ -1,0 +1,42 @@
+{
+  "accounts": [
+    {
+      "id": "chk-001",
+      "name": "Joint Checking",
+      "currency": "USD",
+      "balance": "4231.78",
+      "org": { "name": "Chase", "domain": "chase.com" },
+      "transactions": [
+        { "id": "t-001", "posted": 1714521600, "amount": "-87.43", "description": "Whole Foods", "pending": false },
+        { "id": "t-002", "posted": 1714608000, "amount": "1500.00", "description": "Paycheck", "pending": false },
+        { "id": "t-003", "posted": 1714694400, "amount": "-12.99", "description": "Spotify", "pending": false }
+      ]
+    },
+    {
+      "id": "cc-101",
+      "name": "Sapphire Card",
+      "currency": "USD",
+      "balance": "-742.10",
+      "org": { "name": "Chase", "domain": "chase.com" },
+      "transactions": [
+        { "id": "c-001", "posted": 1714521600, "amount": "-45.00", "description": "Restaurant", "pending": false },
+        { "id": "c-002", "posted": 1714608000, "amount": "-120.00", "description": "Flight", "pending": false }
+      ]
+    },
+    {
+      "id": "brk-301",
+      "name": "Brokerage",
+      "currency": "USD",
+      "balance": "12500.00",
+      "org": { "name": "Fidelity", "domain": "fidelity.com" },
+      "transactions": [
+        { "id": "x-001", "posted": 1714521600, "amount": "-500.00", "description": "Buy VTI" }
+      ],
+      "holdings": [
+        { "symbol": "VTI", "shares": "50", "market_value": "11500.00", "cost_basis": "10000.00", "description": "Vanguard Total Stock", "currency": "USD" },
+        { "symbol": "BND", "shares": "10", "market_value": "1000.00",  "cost_basis": "1000.00",  "description": "Vanguard Total Bond",  "currency": "USD" }
+      ]
+    }
+  ],
+  "errlist": ["bank login failed for example-bank-x"]
+}

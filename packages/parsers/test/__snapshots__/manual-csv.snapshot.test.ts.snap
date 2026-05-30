@@ -1,0 +1,173 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`manualCsvParser snapshot emits the expected op stream for the chase fixture 1`] = `
+[
+  {
+    "draft": {
+      "currency": "USD",
+      "display_name": "Chase Checking",
+      "id": "manual:chase-checking",
+      "institution": "Chase",
+      "mode": "manual",
+      "type": "checking",
+    },
+    "kind": "account_discovery",
+  },
+  {
+    "external_id": "c7c50dd9e4dab35e",
+    "kind": "raw_event",
+    "payload": {
+      "amount": -32.5,
+      "currency": "USD",
+      "date": "2025-01-01",
+      "description": "Grocery store",
+      "file": "fixture",
+      "line": 1,
+    },
+    "source": "manual-csv",
+    "source_file": "fixture",
+  },
+  {
+    "draft": {
+      "account_id": "manual:chase-checking",
+      "amount": -32.5,
+      "currency": "USD",
+      "date": "2025-01-01",
+      "derived_by": "manual-csv",
+      "description": "Grocery store",
+    },
+    "event_refs": [
+      {
+        "external_id": "c7c50dd9e4dab35e",
+        "source": "manual-csv",
+      },
+    ],
+    "kind": "one_sided",
+  },
+  {
+    "external_id": "d7463e1c16af5925",
+    "kind": "raw_event",
+    "payload": {
+      "amount": -58.2,
+      "currency": "USD",
+      "date": "2025-01-03",
+      "description": "Whole Foods, Market",
+      "file": "fixture",
+      "line": 2,
+    },
+    "source": "manual-csv",
+    "source_file": "fixture",
+  },
+  {
+    "draft": {
+      "account_id": "manual:chase-checking",
+      "amount": -58.2,
+      "currency": "USD",
+      "date": "2025-01-03",
+      "derived_by": "manual-csv",
+      "description": "Whole Foods, Market",
+    },
+    "event_refs": [
+      {
+        "external_id": "d7463e1c16af5925",
+        "source": "manual-csv",
+      },
+    ],
+    "kind": "one_sided",
+  },
+  {
+    "external_id": "a4a288d06c25e277",
+    "kind": "raw_event",
+    "payload": {
+      "amount": -4.75,
+      "currency": "USD",
+      "date": "2025-01-05",
+      "description": "Coffee shop",
+      "file": "fixture",
+      "line": 3,
+    },
+    "source": "manual-csv",
+    "source_file": "fixture",
+  },
+  {
+    "draft": {
+      "account_id": "manual:chase-checking",
+      "amount": -4.75,
+      "currency": "USD",
+      "date": "2025-01-05",
+      "derived_by": "manual-csv",
+      "description": "Coffee shop",
+    },
+    "event_refs": [
+      {
+        "external_id": "a4a288d06c25e277",
+        "source": "manual-csv",
+      },
+    ],
+    "kind": "one_sided",
+  },
+  {
+    "external_id": "c278191d5f2bb94b",
+    "kind": "raw_event",
+    "payload": {
+      "amount": -4.75,
+      "currency": "USD",
+      "date": "2025-01-05",
+      "description": "Coffee shop",
+      "file": "fixture",
+      "line": 4,
+    },
+    "source": "manual-csv",
+    "source_file": "fixture",
+  },
+  {
+    "draft": {
+      "account_id": "manual:chase-checking",
+      "amount": -4.75,
+      "currency": "USD",
+      "date": "2025-01-05",
+      "derived_by": "manual-csv",
+      "description": "Coffee shop",
+    },
+    "event_refs": [
+      {
+        "external_id": "c278191d5f2bb94b",
+        "source": "manual-csv",
+      },
+    ],
+    "kind": "one_sided",
+  },
+  {
+    "kind": "sync_warning",
+    "warning": {
+      "detail": {
+        "fields": [
+          "2025-01-06",
+          "Bad amount row",
+          "not-a-number",
+        ],
+        "line": 5,
+      },
+      "message": "skipped row 5: amount "not-a-number" is not numeric",
+      "scope": "fixture",
+      "source": "manual-csv",
+    },
+  },
+  {
+    "kind": "sync_warning",
+    "warning": {
+      "detail": {
+        "fields": [
+          "01/15/2025",
+          "Wrong format date",
+          "-10.00",
+        ],
+        "line": 6,
+      },
+      "message": "skipped row 6: parseDate: "01/15/2025" doesn't match YYYY-MM-DD",
+      "scope": "fixture",
+      "source": "manual-csv",
+    },
+  },
+]
+`;

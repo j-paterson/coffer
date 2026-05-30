@@ -1,0 +1,17 @@
+[install]
+# Block npm package versions published in the last 3 days. Malicious
+# packages are usually yanked from the registry within hours of disclosure,
+# so a short cooldown blunts most supply-chain attacks without slowing
+# routine work. Docs: https://bun.com/docs/runtime/bunfig
+minimumReleaseAge = 259200
+
+# Workspace packages resolve via the `workspace:` protocol and never touch
+# the npm registry, so they bypass the age gate by construction. Listed
+# explicitly so a future workspace rename or refactor doesn't surprise us.
+# Bun's exclude list does not support globs — exact names required.
+minimumReleaseAgeExcludes = [
+  "@finance/server",
+  "@finance/web",
+  "@finance/ledger",
+  "@finance/parsers",
+]

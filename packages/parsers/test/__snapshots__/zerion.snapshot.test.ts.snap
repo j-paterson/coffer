@@ -1,0 +1,224 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`zerionParser surface end-to-end Operation stream is stable (snapshot) 1`] = `
+[
+  {
+    "draft": {
+      "currency": "USD",
+      "display_name": "Zerion ethereum 0xabcd…ef01",
+      "external_id": "zerion:ethereum:0xabcdef0123456789abcdef0123456789abcdef01",
+      "id": "zerion:ethereum:0xabcdef0123456789abcdef0123456789abcdef01",
+      "institution": "zerion",
+      "mode": "live",
+      "source": "zerion",
+      "type": "crypto_wallet",
+    },
+    "kind": "account_discovery",
+  },
+  {
+    "draft": {
+      "account_id": "zerion:ethereum:0xabcdef0123456789abcdef0123456789abcdef01",
+      "as_of": "2023-11-25",
+      "chain": "ethereum",
+      "contract_address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "price_usd": 1.0005,
+      "qty": 1000,
+      "source": "zerion",
+      "symbol": "USDC",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "zerion:ethereum:0xabcdef0123456789abcdef0123456789abcdef01",
+      "as_of": "2023-11-25",
+      "chain": "ethereum",
+      "contract_address": null,
+      "price_usd": 2000,
+      "qty": 1.5,
+      "source": "zerion",
+      "symbol": "ETH",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "currency": "USD",
+      "display_name": "Zerion base 0xabcd…ef01",
+      "external_id": "zerion:base:0xabcdef0123456789abcdef0123456789abcdef01",
+      "id": "zerion:base:0xabcdef0123456789abcdef0123456789abcdef01",
+      "institution": "zerion",
+      "mode": "live",
+      "source": "zerion",
+      "type": "crypto_wallet",
+    },
+    "kind": "account_discovery",
+  },
+  {
+    "draft": {
+      "account_id": "zerion:base:0xabcdef0123456789abcdef0123456789abcdef01",
+      "as_of": "2023-11-25",
+      "chain": "base",
+      "contract_address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "price_usd": 1.0005,
+      "qty": 500,
+      "source": "zerion",
+      "symbol": "USDC",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "zerion:ethereum:0xabcdef0123456789abcdef0123456789abcdef01",
+      "as_of": "2023-11-14",
+      "expected_usd": 4000,
+      "source": "zerion-chart",
+    },
+    "kind": "assertion",
+  },
+  {
+    "draft": {
+      "account_id": "zerion:ethereum:0xabcdef0123456789abcdef0123456789abcdef01",
+      "as_of": "2023-11-21",
+      "expected_usd": 4100.5,
+      "source": "zerion-chart",
+    },
+    "kind": "assertion",
+  },
+  {
+    "draft": {
+      "account_id": "zerion:ethereum:0xabcdef0123456789abcdef0123456789abcdef01",
+      "as_of": "2023-11-28",
+      "expected_usd": 4200.75,
+      "source": "zerion-chart",
+    },
+    "kind": "assertion",
+  },
+  {
+    "draft": {
+      "account_id": "zerion:base:0xabcdef0123456789abcdef0123456789abcdef01",
+      "as_of": "2023-11-14",
+      "expected_usd": 4000,
+      "source": "zerion-chart",
+    },
+    "kind": "assertion",
+  },
+  {
+    "draft": {
+      "account_id": "zerion:base:0xabcdef0123456789abcdef0123456789abcdef01",
+      "as_of": "2023-11-21",
+      "expected_usd": 4100.5,
+      "source": "zerion-chart",
+    },
+    "kind": "assertion",
+  },
+  {
+    "draft": {
+      "account_id": "zerion:base:0xabcdef0123456789abcdef0123456789abcdef01",
+      "as_of": "2023-11-28",
+      "expected_usd": 4200.75,
+      "source": "zerion-chart",
+    },
+    "kind": "assertion",
+  },
+  {
+    "draft": {
+      "as_of": "2023-11-14",
+      "chain": "ethereum",
+      "contract_address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "price_usd": 1.0001,
+      "source": "zerion",
+      "symbol": "USDC",
+    },
+    "kind": "asset_price",
+  },
+  {
+    "draft": {
+      "as_of": "2023-11-14",
+      "chain": "base",
+      "contract_address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "price_usd": 1.0001,
+      "source": "zerion",
+      "symbol": "USDC",
+    },
+    "kind": "asset_price",
+  },
+  {
+    "draft": {
+      "as_of": "2023-11-21",
+      "chain": "ethereum",
+      "contract_address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "price_usd": 1.0002,
+      "source": "zerion",
+      "symbol": "USDC",
+    },
+    "kind": "asset_price",
+  },
+  {
+    "draft": {
+      "as_of": "2023-11-21",
+      "chain": "base",
+      "contract_address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "price_usd": 1.0002,
+      "source": "zerion",
+      "symbol": "USDC",
+    },
+    "kind": "asset_price",
+  },
+  {
+    "draft": {
+      "as_of": "2023-11-28",
+      "chain": "ethereum",
+      "contract_address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "price_usd": 0.9998,
+      "source": "zerion",
+      "symbol": "USDC",
+    },
+    "kind": "asset_price",
+  },
+  {
+    "draft": {
+      "as_of": "2023-11-28",
+      "chain": "base",
+      "contract_address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "price_usd": 0.9998,
+      "source": "zerion",
+      "symbol": "USDC",
+    },
+    "kind": "asset_price",
+  },
+  {
+    "draft": {
+      "as_of": "2023-11-14",
+      "chain": "ethereum",
+      "contract_address": null,
+      "price_usd": 2000,
+      "source": "zerion",
+      "symbol": "ETH",
+    },
+    "kind": "asset_price",
+  },
+  {
+    "draft": {
+      "as_of": "2023-11-21",
+      "chain": "ethereum",
+      "contract_address": null,
+      "price_usd": 2100,
+      "source": "zerion",
+      "symbol": "ETH",
+    },
+    "kind": "asset_price",
+  },
+  {
+    "draft": {
+      "as_of": "2023-11-28",
+      "chain": "ethereum",
+      "contract_address": null,
+      "price_usd": 2050.5,
+      "source": "zerion",
+      "symbol": "ETH",
+    },
+    "kind": "asset_price",
+  },
+]
+`;

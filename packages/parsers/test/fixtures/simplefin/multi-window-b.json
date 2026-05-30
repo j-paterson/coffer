@@ -1,0 +1,16 @@
+{
+  "accounts": [
+    {
+      "id": "chk-001",
+      "name": "Joint Checking",
+      "currency": "USD",
+      "balance": "4231.78",
+      "org": { "name": "Chase", "domain": "chase.com" },
+      "transactions": [
+        { "id": "shared",  "posted": 1713000000, "amount": "-50.00", "description": "Shared (newer version)" },
+        { "id": "new-only", "posted": 1714000000, "amount": "200.00", "description": "Only in new window" }
+      ]
+    }
+  ],
+  "errlist": ["error B", "shared error"]
+}

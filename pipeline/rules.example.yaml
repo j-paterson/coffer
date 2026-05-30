@@ -1,0 +1,584 @@
+# rules.example.yaml — categorization rules for `finance categorize`
+#
+# This is a committed example. Copy it to `pipeline/rules.yaml` (gitignored)
+# and customize for your real merchants.
+#
+# How rules work:
+#   - Rules are evaluated in priority order (lower number = higher priority).
+#   - Each rule has `when` (a list of conditions, AND'd together) and `then`
+#     (a list of actions). If all conditions match, the actions apply.
+#   - An action `{ stop: true }` halts further rule evaluation for that txn.
+#   - Without stop, multiple rules can stack actions (e.g., set category in
+#     one rule, add a tag in another).
+#
+# Supported condition operators:
+#   field=description: equals, contains, contains_any, starts_with, regex
+#   field=amount:      gt, gte, lt, lte
+#   field=account_id:  equals, contains
+#
+# Supported actions:
+#   { set: category, value: <category-name> }
+#   { set: subcategory, value: <name> }
+#   { add_tag: <name> }
+#   { stop: true }
+
+# Top-level categories. The categorize engine will warn if a rule references
+# a category not in this list — keeps the taxonomy from drifting.
+categories:
+  - Income
+  - Transfer
+  - Groceries
+  - Restaurants
+  - Coffee
+  - Gas
+  - Utilities
+  - Internet
+  - Subscriptions
+  - Software
+  - Healthcare
+  - Insurance
+  - Auto
+  - Travel
+  - Shopping
+  - Entertainment
+  - Fitness
+  - Pets
+  - Cash
+  - Fees
+  - Charity
+  - Personal
+  - Uncategorized
+
+rules:
+  # ============================================================
+  # Priority 1: Transfers (caught before any spending category)
+  # ============================================================
+  # Note: pair-based transfer detection runs as a separate pre-pass before
+  # rule evaluation; these rules are a fallback for cases where the pair's
+  # other side isn't in the DB (e.g., paying off a card we don't sync).
+
+  - name: chase-cc-autopay-out
+    priority: 1
+    when:
+      - { field: description, op: contains, value: "CHASE CREDIT CRD AUTOPAY" }
+    then:
+      - { set: category, value: Transfer }
+      - { add_tag: autopay }
+      - { stop: true }
+
+  - name: chase-cc-autopay-in
+    priority: 1
+    when:
+      - { field: description, op: equals, value: "AUTOMATIC PAYMENT - THANK" }
+    then:
+      - { set: category, value: Transfer }
+      - { add_tag: autopay }
+      - { stop: true }
+
+  - name: chase-cc-payment-thank-you
+    priority: 1
+    when:
+      - { field: description, op: equals, value: "Payment Thank You - Web" }
+    then:
+      - { set: category, value: Transfer }
+      - { stop: true }
+
+  - name: chase-cc-payment-out
+    priority: 1
+    when:
+      - { field: description, op: starts_with, value: "Payment to Chase card ending in" }
+    then:
+      - { set: category, value: Transfer }
+      - { stop: true }
+
+  - name: amex-ach-payment
+    priority: 1
+    when:
+      - { field: description, op: starts_with, value: "AMERICAN EXPRESS ACH PMT" }
+    then:
+      - { set: category, value: Transfer }
+      - { add_tag: autopay }
+      - { stop: true }
+
+  - name: amex-retry-payment
+    priority: 1
+    when:
+      - { field: description, op: starts_with, value: "AMERICAN EXPRESS RETRY PYMT" }
+    then:
+      - { set: category, value: Transfer }
+      - { stop: true }
+
+  - name: chase-internal-transfer
+    priority: 1
+    when:
+      - { field: description, op: regex, value: "^Online Transfer (to|from) CHK" }
+    then:
+      - { set: category, value: Transfer }
+      - { stop: true }
+
+  - name: real-time-transfer
+    priority: 1
+    when:
+      - { field: description, op: starts_with, value: "REAL TIME TRANSFER" }
+    then:
+      - { set: category, value: Transfer }
+      - { stop: true }
+
+  # ============================================================
+  # Priority 5: Income
+  # ============================================================
+
+  - name: payroll-jo-solutions
+    priority: 5
+    when:
+      - { field: description, op: contains_any, values: ["JO SOLUTIONS", "PEO JO SOLUTION"] }
+      - { field: amount, op: gt, value: 0 }
+    then:
+      - { set: category, value: Income }
+      - { add_tag: payroll }
+      - { stop: true }
+
+  # Coinbase-to-checking deposits are exchange withdrawals (your money
+  # moving from one wallet into spending), NOT income. Categorize as
+  # Transfer so the cashflow income detector doesn't inflate.
+  - name: coinbase-withdrawal
+    priority: 5
+    when:
+      - { field: description, op: contains, value: "Coinbase.com" }
+      - { field: amount, op: gt, value: 0 }
+    then:
+      - { set: category, value: Transfer }
+      - { add_tag: crypto }
+      - { stop: true }
+
+  # ============================================================
+  # Priority 10: Bills, utilities, subscriptions, software
+  # ============================================================
+
+  - name: gas-utility
+    priority: 10
+    when:
+      - { field: description, op: contains, value: "TEXAS GAS SERVICE" }
+    then:
+      - { set: category, value: Utilities }
+      - { add_tag: bill }
+
+  - name: water-utility
+    priority: 10
+    when:
+      - { field: description, op: contains, value: "City of Austin" }
+    then:
+      - { set: category, value: Utilities }
+      - { add_tag: bill }
+
+  - name: insurance-farmers
+    priority: 10
+    when:
+      - { field: description, op: contains, value: "FARMERS INS" }
+    then:
+      - { set: category, value: Insurance }
+      - { add_tag: bill }
+
+  - name: claude-ai
+    priority: 10
+    when:
+      - { field: description, op: contains, value: "CLAUDE.AI" }
+    then:
+      - { set: category, value: Software }
+      - { add_tag: subscription }
+
+  - name: 1password
+    priority: 10
+    when:
+      - { field: description, op: contains, value: "1PASSWORD" }
+    then:
+      - { set: category, value: Software }
+      - { add_tag: subscription }
+
+  - name: cursor
+    priority: 10
+    when:
+      - { field: description, op: contains, value: "CURSOR" }
+    then:
+      - { set: category, value: Software }
+      - { add_tag: subscription }
+
+  - name: google-workspace
+    priority: 10
+    when:
+      - { field: description, op: contains, value: "GOOGLE *Workspace" }
+    then:
+      - { set: category, value: Software }
+      - { add_tag: subscription }
+
+  - name: google-one
+    priority: 10
+    when:
+      - { field: description, op: contains_any, values: ["GOOGLE *Google One", "Google One"] }
+    then:
+      - { set: category, value: Software }
+      - { add_tag: subscription }
+
+  - name: google-fiber
+    priority: 10
+    when:
+      - { field: description, op: contains, value: "GOOGLE *FIBER" }
+    then:
+      - { set: category, value: Internet }
+      - { add_tag: bill }
+
+  - name: apple-icloud
+    priority: 10
+    when:
+      - { field: description, op: equals, value: "APPLE.COM/BILL" }
+    then:
+      - { set: category, value: Software }
+      - { add_tag: subscription }
+
+  - name: cointracker
+    priority: 10
+    when:
+      - { field: description, op: contains, value: "COINTRACKER" }
+    then:
+      - { set: category, value: Software }
+      - { add_tag: subscription }
+
+  - name: steam
+    priority: 10
+    when:
+      - { field: description, op: contains, value: "STEAMGAMES.COM" }
+    then:
+      - { set: category, value: Entertainment }
+      - { add_tag: subscription }
+
+  # ============================================================
+  # Priority 20: Specific merchants (groceries, food, healthcare)
+  # ============================================================
+
+  - name: heb
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "H-E-B" }
+    then:
+      - { set: category, value: Groceries }
+
+  - name: costco
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "COSTCO" }
+    then:
+      - { set: category, value: Groceries }
+
+  - name: restaurants-toast
+    priority: 20
+    when:
+      - { field: description, op: regex, value: "^TST\\*" }
+    then:
+      - { set: category, value: Restaurants }
+
+  - name: doordash
+    priority: 20
+    when:
+      - { field: description, op: starts_with, value: "DD *DOORDASH" }
+    then:
+      - { set: category, value: Restaurants }
+      - { add_tag: delivery }
+
+  - name: torchys
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "TORCHYS" }
+    then:
+      - { set: category, value: Restaurants }
+
+  - name: pterrys
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "P. TERRY" }
+    then:
+      - { set: category, value: Restaurants }
+
+  - name: kerbey-lane
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "KERBEY LANE" }
+    then:
+      - { set: category, value: Restaurants }
+
+  - name: square-restaurants
+    priority: 20
+    when:
+      - { field: description, op: contains_any, values: ["SQ *PRANA CAFE", "MOONTOWER SALOON", "THREE BEARS RESTAURANT", "LETYS FOOD"] }
+    then:
+      - { set: category, value: Restaurants }
+
+  - name: liquor
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "LIQUORS" }
+    then:
+      - { set: category, value: Restaurants }
+      - { add_tag: alcohol }
+
+  - name: convenience-stores
+    priority: 20
+    when:
+      - { field: description, op: contains_any, values: ["7-ELEVEN"] }
+    then:
+      - { set: category, value: Groceries }
+      - { add_tag: convenience }
+
+  - name: psychiatry
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "SPELBER PSYCHIATRY" }
+    then:
+      - { set: category, value: Healthcare }
+
+  - name: planned-parenthood
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "PLANNED PARENTHOOD" }
+    then:
+      - { set: category, value: Healthcare }
+
+  - name: vet
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "NVA LOVE PET HOSP" }
+    then:
+      - { set: category, value: Pets }
+
+  - name: bouldering
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "AUSTIN BOULDERING" }
+    then:
+      - { set: category, value: Fitness }
+
+  - name: ikes-clubhouse-golf
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "IKE'S CLUBHOUSE" }
+    then:
+      - { set: category, value: Fitness }
+      - { add_tag: golf }
+
+  - name: cota-racing
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "CIRCUIT OF THE AM" }
+    then:
+      - { set: category, value: Entertainment }
+
+  - name: foundry-gaming
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "FOUNDRY GAMING" }
+    then:
+      - { set: category, value: Entertainment }
+
+  - name: sxsw
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "SXSW" }
+    then:
+      - { set: category, value: Entertainment }
+
+  - name: sentry-ammo
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "SENTRY AMMO" }
+    then:
+      - { set: category, value: Personal }
+
+  - name: swing-dancing
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "AUSTIN SWING" }
+    then:
+      - { set: category, value: Entertainment }
+      - { add_tag: dance }
+
+  - name: porsche
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "PORSCHE" }
+    then:
+      - { set: category, value: Auto }
+
+  - name: roger-beasley
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "ROGER BEASLEY" }
+    then:
+      - { set: category, value: Auto }
+
+  - name: chevron-gas
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "CHEVRON" }
+    then:
+      - { set: category, value: Gas }
+
+  - name: lowes
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "LOWES" }
+    then:
+      - { set: category, value: Shopping }
+      - { add_tag: home }
+
+  - name: home-shopping-square
+    priority: 20
+    when:
+      - { field: description, op: contains_any, values: ["3HLINEN", "SP CURTAIN", "SP ART SHADES", "SP ANDAR", "SP BATHINGCULTURE", "EMERYALLEN", "TEMPLE OF INCENSE"] }
+    then:
+      - { set: category, value: Shopping }
+      - { add_tag: home }
+
+  - name: taskrabbit
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "TASKRABBIT" }
+    then:
+      - { set: category, value: Personal }
+      - { add_tag: services }
+
+  - name: equipment-rentals
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "Rock N Roll Rentals" }
+    then:
+      - { set: category, value: Personal }
+
+  - name: rei
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "REI.COM" }
+    then:
+      - { set: category, value: Shopping }
+      - { add_tag: outdoors }
+
+  - name: westjet
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "WESTJET" }
+    then:
+      - { set: category, value: Travel }
+      - { add_tag: flights }
+
+  - name: monod-banff
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "MONOD SPORTS BANFF" }
+    then:
+      - { set: category, value: Travel }
+
+  - name: banff-springs
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "BANFF SPRINGS HOTEL" }
+    then:
+      - { set: category, value: Travel }
+      - { add_tag: lodging }
+
+  - name: delta-air
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "DELTA AIR" }
+    then:
+      - { set: category, value: Travel }
+      - { add_tag: flights }
+
+  - name: ski-rentals
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "SKILOUISE RENTALS" }
+    then:
+      - { set: category, value: Travel }
+
+  # ============================================================
+  # Priority 25: Amount-modified rules (must beat the generic Amazon rule)
+  # ============================================================
+
+  - name: amazon-large-purchase
+    priority: 25
+    when:
+      - { field: description, op: contains, value: "AMAZON" }
+      - { field: amount, op: lte, value: -200 }
+    then:
+      - { set: category, value: Shopping }
+      - { add_tag: large-purchase }
+
+  # ============================================================
+  # Priority 30: Generic merchant catch-alls
+  # ============================================================
+
+  - name: amazon
+    priority: 30
+    when:
+      - { field: description, op: contains_any, values: ["AMAZON MKTPL", "Amazon.com", "AMAZON MKTPLACE"] }
+    then:
+      - { set: category, value: Shopping }
+
+  - name: bestbuy
+    priority: 30
+    when:
+      - { field: description, op: contains, value: "BESTBUY" }
+    then:
+      - { set: category, value: Shopping }
+
+  # ============================================================
+  # Priority 50: Fees and cash (lowest priority — catch leftovers)
+  # ============================================================
+
+  - name: bank-fees
+    priority: 50
+    when:
+      - { field: description, op: contains_any, values: ["MONTHLY SERVICE FEE", "PURCHASE INTEREST CHARGE", "INTEREST CHARGE", "ANNUAL MEMBERSHIP FEE", "NON-CHASE ATM FEE"] }
+    then:
+      - { set: category, value: Fees }
+
+  - name: atm
+    priority: 50
+    when:
+      - { field: description, op: contains, value: "ATM WITHDRAW" }
+    then:
+      - { set: category, value: Cash }
+
+  # ============================================================
+  # Priority 80: P2P (Venmo, Apple Cash) — uncategorizable from
+  # description alone, but at least bucket them so they don't pollute
+  # "Uncategorized". Tag with the source so they're easy to find later.
+  # ============================================================
+
+  - name: venmo
+    priority: 80
+    when:
+      - { field: description, op: starts_with, value: "VENMO PAYMENT" }
+    then:
+      - { set: category, value: Personal }
+      - { add_tag: venmo }
+
+  - name: apple-cash
+    priority: 80
+    when:
+      - { field: description, op: starts_with, value: "APPLE CASH SENT" }
+    then:
+      - { set: category, value: Personal }
+      - { add_tag: apple-cash }
+
+  - name: big-bucket-3
+    priority: 80
+    when:
+      - { field: description, op: equals, value: "BIG BUCKET 3" }
+    then:
+      - { set: category, value: Personal }
+
+  - name: srndr2chanc
+    priority: 80
+    when:
+      - { field: description, op: equals, value: "SRNDR2CHANC" }
+    then:
+      - { set: category, value: Personal }

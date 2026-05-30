@@ -1,0 +1,39 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`defiLlamaParser snapshot emits the expected op stream for the single-chunk fixture 1`] = `
+[
+  {
+    "draft": {
+      "as_of": "2023-11-14",
+      "chain": "",
+      "contract_address": null,
+      "price_usd": 2500,
+      "source": "defillama",
+      "symbol": "ETH",
+    },
+    "kind": "asset_price",
+  },
+  {
+    "draft": {
+      "as_of": "2023-11-15",
+      "chain": "",
+      "contract_address": null,
+      "price_usd": 2510,
+      "source": "defillama",
+      "symbol": "ETH",
+    },
+    "kind": "asset_price",
+  },
+  {
+    "draft": {
+      "as_of": "2023-11-16",
+      "chain": "",
+      "contract_address": null,
+      "price_usd": 2520,
+      "source": "defillama",
+      "symbol": "ETH",
+    },
+    "kind": "asset_price",
+  },
+]
+`;

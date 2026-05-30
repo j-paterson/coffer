@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "id": "p-eth",
+      "type": "positions",
+      "attributes": {
+        "quantity": { "float": 1.0, "numeric": "1.0", "decimals": 18 },
+        "value": 2000.0,
+        "fungible_info": {
+          "symbol": "ETH",
+          "implementations": [{ "chain_id": "ethereum", "address": null, "decimals": 18 }]
+        }
+      },
+      "relationships": {
+        "chain":    { "data": { "id": "ethereum" } },
+        "fungible": { "data": { "id": "f-eth" } }
+      }
+    }
+  ],
+  "links": { "next": "https://api.zerion.io/v1/wallets/0xabcdef0123456789abcdef0123456789abcdef01/positions/?page%5Bafter%5D=cursorA" }
+}

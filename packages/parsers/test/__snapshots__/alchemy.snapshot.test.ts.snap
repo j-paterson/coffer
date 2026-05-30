@@ -1,0 +1,97 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`alchemyParser surface end-to-end Operation stream is stable (snapshot) 1`] = `
+[
+  {
+    "draft": {
+      "currency": "USD",
+      "display_name": "Ethereum 0xabcd…ef01",
+      "external_id": "zerion:ethereum:0xabcdef0123456789abcdef0123456789abcdef01",
+      "id": "zerion:ethereum:0xabcdef0123456789abcdef0123456789abcdef01",
+      "institution": "alchemy",
+      "mode": "live",
+      "source": "alchemy",
+      "type": "crypto_wallet",
+    },
+    "kind": "account_discovery",
+  },
+  {
+    "draft": {
+      "account_id": "zerion:ethereum:0xabcdef0123456789abcdef0123456789abcdef01",
+      "as_of": "2026-05-14",
+      "chain": "ethereum",
+      "contract_address": null,
+      "price_usd": null,
+      "qty": 1.5,
+      "source": "alchemy",
+      "symbol": "ETH",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "zerion:ethereum:0xabcdef0123456789abcdef0123456789abcdef01",
+      "as_of": "2026-05-14",
+      "chain": "ethereum",
+      "contract_address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+      "price_usd": null,
+      "qty": 1000,
+      "source": "alchemy",
+      "symbol": "USDC",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "zerion:ethereum:0xabcdef0123456789abcdef0123456789abcdef01",
+      "as_of": "2026-05-14",
+      "chain": "ethereum",
+      "contract_address": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "price_usd": null,
+      "qty": 0.5,
+      "source": "alchemy",
+      "symbol": "WETH",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "currency": "USD",
+      "display_name": "Base 0xabcd…ef01",
+      "external_id": "zerion:base:0xabcdef0123456789abcdef0123456789abcdef01",
+      "id": "zerion:base:0xabcdef0123456789abcdef0123456789abcdef01",
+      "institution": "alchemy",
+      "mode": "live",
+      "source": "alchemy",
+      "type": "crypto_wallet",
+    },
+    "kind": "account_discovery",
+  },
+  {
+    "draft": {
+      "account_id": "zerion:base:0xabcdef0123456789abcdef0123456789abcdef01",
+      "as_of": "2026-05-14",
+      "chain": "base",
+      "contract_address": null,
+      "price_usd": null,
+      "qty": 1.5,
+      "source": "alchemy",
+      "symbol": "ETH",
+    },
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "account_id": "zerion:base:0xabcdef0123456789abcdef0123456789abcdef01",
+      "as_of": "2026-05-14",
+      "chain": "base",
+      "contract_address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      "price_usd": null,
+      "qty": 5000,
+      "source": "alchemy",
+      "symbol": "USDC",
+    },
+    "kind": "position_snapshot",
+  },
+]
+`;

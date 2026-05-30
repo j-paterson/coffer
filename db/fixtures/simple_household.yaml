@@ -1,0 +1,42 @@
+name: simple_household
+description: |
+  A household with a checking account, savings account, and one credit
+  card. Used as the smoke-test fixture for both Python and TS loaders.
+  No crypto, no real-estate, no transfer-pair edge cases.
+as_of: "2026-04-27"
+
+accounts:
+  - id: simplefin:chk-1234
+    type: checking
+    institution: Chase
+    display_name: Chase Checking
+    mode: live
+    active: 1
+  - id: simplefin:sav-5678
+    type: savings
+    institution: Chase
+    display_name: Chase Savings
+    mode: live
+    active: 1
+  - id: simplefin:cc-9999
+    type: credit
+    institution: Chase
+    display_name: Chase Sapphire
+    mode: live
+    active: 1
+
+postings:
+  - txn:
+      date: 2025-01-01
+      description: opening balances
+      derived_by: ingest
+    legs:
+      - { account_id: simplefin:chk-1234,        amount:  4500.00 }
+      - { account_id: simplefin:sav-5678,        amount: 12000.00 }
+      - { account_id: simplefin:cc-9999,         amount:  -850.00 }
+      - { account_id: equity:opening-balance,    amount: -15650.00 }
+
+balance_assertions:
+  - { account_id: simplefin:chk-1234, as_of: 2026-04-17, expected_usd:  5234.00, source: simplefin, source_file: feed }
+  - { account_id: simplefin:sav-5678, as_of: 2026-04-17, expected_usd: 12450.00, source: simplefin, source_file: feed }
+  - { account_id: simplefin:cc-9999,  as_of: 2026-04-17, expected_usd:  -742.00, source: simplefin, source_file: feed }
