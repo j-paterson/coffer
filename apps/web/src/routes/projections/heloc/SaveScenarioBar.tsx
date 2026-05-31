@@ -8,13 +8,15 @@ export function SaveScenarioBar({ scenario, onLoaded }: { scenario: Scenario; on
     const res = await fetch("/api/projections", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ scenario: { ...scenario, name } }),
+      body: JSON.stringify({
+        scenario: { ...scenario, name, projectionKind: "heloc" as const },
+      }),
     }).then((r) => r.json());
     await refresh();
     return res;
   }
   async function refresh() {
-    const list = await fetch("/api/projections").then((r) => r.json());
+    const list = await fetch("/api/projections?kind=heloc").then((r) => r.json());
     setSaved(list.scenarios);
   }
   async function load(id: string) {
