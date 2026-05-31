@@ -23,6 +23,7 @@ beforeEach(() => {
       mc_seed                INTEGER,
       comparison_scenario_id TEXT,
       composition_json       TEXT,
+      projection_kind        TEXT NOT NULL DEFAULT 'heloc',
       created_at             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );

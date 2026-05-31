@@ -37,20 +37,22 @@ type SavedScenario = Pick<
   Scenario,
   "id" | "name" | "notes" | "startDate" | "horizonMonths"
   | "baselineReturnPct" | "baselineVolPct" | "homeAppreciationPct" | "mc" | "events"
-  | "composition"
+  | "composition" | "projectionKind"
 >;
 
 export function upsertScenarioWith(database: Database, scenario: Scenario): string {
   const id = scenario.id ?? randomUUID();
   const name = scenario.name ?? `Scenario ${new Date().toISOString().slice(0, 10)}`;
+  const projectionKind = scenario.projectionKind ?? "heloc";
   const now = new Date().toISOString();
   database.transaction(() => {
     database
       .prepare(
         `INSERT INTO scenarios (id, name, notes, start_date, horizon_months,
           baseline_return_pct, baseline_vol_pct, home_appreciation_pct,
-          mc_enabled, mc_paths, mc_seed, comparison_scenario_id, composition_json, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          mc_enabled, mc_paths, mc_seed, comparison_scenario_id, composition_json,
+          projection_kind, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            name=excluded.name, notes=excluded.notes, start_date=excluded.start_date,
            horizon_months=excluded.horizon_months,
@@ -60,6 +62,7 @@ export function upsertScenarioWith(database: Database, scenario: Scenario): stri
            mc_enabled=excluded.mc_enabled, mc_paths=excluded.mc_paths,
            mc_seed=excluded.mc_seed, comparison_scenario_id=excluded.comparison_scenario_id,
            composition_json=excluded.composition_json,
+           projection_kind=excluded.projection_kind,
            updated_at=excluded.updated_at`,
       )
       .run(
@@ -76,6 +79,7 @@ export function upsertScenarioWith(database: Database, scenario: Scenario): stri
         scenario.mc.seed ?? null,
         null,
         scenario.composition !== undefined ? JSON.stringify(scenario.composition) : null,
+        projectionKind,
         now,
       );
     database.prepare(`DELETE FROM scenario_events WHERE scenario_id = ?`).run(id);
@@ -118,6 +122,7 @@ export function loadScenarioWith(database: Database, id: string): SavedScenario 
     },
     events,
     composition: r.composition_json ? JSON.parse(r.composition_json) : undefined,
+    projectionKind: r.projection_kind ?? "heloc",
   };
 }
 
@@ -130,11 +135,18 @@ route.post("/", async (c) => {
 
 route.get("/", (c) => {
   const ctx = c.get("ctx") as Ctx;
-  const rows = ctx.db
-    .query<SavedSummaryRow, []>(
-      `SELECT id, name, updated_at FROM scenarios ORDER BY updated_at DESC`,
-    )
-    .all();
+  const kind = c.req.query("kind");
+  const rows = kind
+    ? ctx.db
+        .query<SavedSummaryRow, [string]>(
+          `SELECT id, name, updated_at FROM scenarios WHERE projection_kind = ? ORDER BY updated_at DESC`,
+        )
+        .all(kind)
+    : ctx.db
+        .query<SavedSummaryRow, []>(
+          `SELECT id, name, updated_at FROM scenarios ORDER BY updated_at DESC`,
+        )
+        .all();
   return c.json({ scenarios: rows });
 });
 

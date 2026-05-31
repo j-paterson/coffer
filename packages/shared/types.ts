@@ -615,6 +615,9 @@ export type Scenario = {
   id?: string;
   name?: string;
   notes?: string;
+  /** Which projection page this scenario belongs to. Defaults to "heloc"
+   *  for legacy scenarios (backfilled by migration 054). */
+  projectionKind?: "heloc" | "retirement" | "mortgage";
   startDate: string;
   horizonMonths: number;
   baselineReturnPct: number;
