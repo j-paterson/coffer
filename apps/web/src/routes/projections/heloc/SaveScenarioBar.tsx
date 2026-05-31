@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Scenario } from "../../../../../packages/shared/types";
+import type { Scenario } from "../../../../../../packages/shared/types";
 
 export function SaveScenarioBar({ scenario, onLoaded }: { scenario: Scenario; onLoaded: (s: Scenario) => void }) {
   const [name, setName] = useState(scenario.name ?? "");

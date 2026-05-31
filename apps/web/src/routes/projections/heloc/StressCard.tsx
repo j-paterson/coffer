@@ -1,4 +1,4 @@
-import type { Scenario, ScenarioEvent } from "../../../../../packages/shared/types";
+import type { Scenario, ScenarioEvent } from "../../../../../../packages/shared/types";
 
 type Props = { scenario: Scenario; onChange: (updater: (s: Scenario) => Scenario) => void };
 

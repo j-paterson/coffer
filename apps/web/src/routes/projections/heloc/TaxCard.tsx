@@ -1,4 +1,4 @@
-import type { Scenario } from "../../../../../packages/shared/types";
+import type { Scenario } from "../../../../../../packages/shared/types";
 
 type Props = {
   scenario: Scenario;

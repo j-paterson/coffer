@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatMessage, ProjectionRunResponse, Scenario } from "../../../../../packages/shared/types";
-import { useAdvisorModel } from "../../lib/queries";
+import type { ChatMessage, ProjectionRunResponse, Scenario } from "../../../../../../packages/shared/types";
+import { useAdvisorModel } from "../../../lib/queries";
 
 type Props = {
   scenario: Scenario;

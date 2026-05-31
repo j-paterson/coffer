@@ -1,4 +1,4 @@
-import type { ProjectionSummary } from "../../../../../packages/shared/types";
+import type { ProjectionSummary } from "../../../../../../packages/shared/types";
 
 function fmtPct(v: number | null | undefined): string {
   if (v == null) return "—";

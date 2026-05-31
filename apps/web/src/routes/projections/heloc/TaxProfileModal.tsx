@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { FilingStatus, TaxProfile, TaxSuggestResponse } from "../../../../../packages/shared/types";
+import type { FilingStatus, TaxProfile, TaxSuggestResponse } from "../../../../../../packages/shared/types";
 
 type Props = {
   onSaved: (tax: TaxProfile) => void;

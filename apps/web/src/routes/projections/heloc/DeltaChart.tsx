@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import type { Timeline } from "../../../../../packages/shared/types";
-import { LineChart, type Series } from "../../lib/LineChart";
-import { usePrivacy, usePrivateFormat, privacyPoints } from "../../lib/privacy";
+import type { Timeline } from "../../../../../../packages/shared/types";
+import { LineChart, type Series } from "../../../lib/LineChart";
+import { usePrivacy, usePrivateFormat, privacyPoints } from "../../../lib/privacy";
 
 export function DeltaChart({
   timeline,

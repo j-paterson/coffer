@@ -1,5 +1,5 @@
-import type { Scenario, PortfolioComposition, SleeveParams } from "../../../../../packages/shared/types";
-import { DEFAULT_COMPOSITION } from "../../../../../packages/shared/types";
+import type { Scenario, PortfolioComposition, SleeveParams } from "../../../../../../packages/shared/types";
+import { DEFAULT_COMPOSITION } from "../../../../../../packages/shared/types";
 
 type Props = {
   scenario: Scenario;
