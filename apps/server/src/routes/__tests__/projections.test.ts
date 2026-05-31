@@ -111,3 +111,21 @@ test("round-trip: upsert clears composition when updated to undefined", () => {
   const loaded = loadScenarioWith(testDb, id);
   expect(loaded!.composition).toBeUndefined();
 });
+
+test("round-trip: projectionKind defaults to 'heloc' when omitted", () => {
+  const scenario: Scenario = { ...BASE_SCENARIO, name: "Defaulted" };
+  const id = upsertScenarioWith(testDb, scenario);
+  const loaded = loadScenarioWith(testDb, id);
+  expect(loaded!.projectionKind).toBe("heloc");
+});
+
+test("round-trip: explicit projectionKind is preserved", () => {
+  const scenario: Scenario = {
+    ...BASE_SCENARIO,
+    name: "Retirement scenario",
+    projectionKind: "retirement",
+  };
+  const id = upsertScenarioWith(testDb, scenario);
+  const loaded = loadScenarioWith(testDb, id);
+  expect(loaded!.projectionKind).toBe("retirement");
+});
