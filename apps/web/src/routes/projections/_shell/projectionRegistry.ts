@@ -12,7 +12,7 @@ export type ProjectionMeta = {
 export const projections: ProjectionMeta[] = [
   {
     slug: "heloc",
-    title: "Home equity loan",
+    title: "HELOC",
     blurb: "Borrow against home equity to invest.",
     status: "ready",
   },

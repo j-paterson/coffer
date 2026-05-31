@@ -86,13 +86,13 @@ export type ProjectionStatus = "ready" | "coming-soon";
 
 export type ProjectionMeta = {
   slug: "heloc" | "retirement" | "mortgage";
-  title: string;          // "Home equity loan"
+  title: string;          // "HELOC"
   blurb: string;          // one-line description for the index card
   status: ProjectionStatus;
 };
 
 export const projections: ProjectionMeta[] = [
-  { slug: "heloc",      title: "Home equity loan",
+  { slug: "heloc",      title: "HELOC",
     blurb: "Borrow against home equity to invest.",
     status: "ready" },
   { slug: "retirement", title: "Retirement",
@@ -106,13 +106,13 @@ export const projections: ProjectionMeta[] = [
 
 ### Top nav
 
-Breadcrumb-style. The label "Projections" is always a link back to the index. The active projection (matched against the current path) is bolded; siblings are muted; coming-soon items are still clickable (they navigate to the stub page).
+Breadcrumb-style: `Projections / HELOC · Retirement · Mortgage`. The label "Projections" is always a link back to the index. The active projection (matched against the current path) is bolded; siblings are muted; coming-soon items are still clickable (they navigate to the stub page).
 
 The layout also exposes a portal target where each projection can mount its own per-projection toolbar (e.g. HELOC's `SaveScenarioBar`). `ProjectionsLayout` renders a `<div id="projection-toolbar" />` in the header row, and `Heloc.tsx` mounts `SaveScenarioBar` into that target via React portal (`createPortal`). Stubs don't mount anything, leaving the slot empty. This avoids passing the toolbar through router context and keeps each projection's UI self-contained.
 
 ### Index page
 
-A simple grid of three `ProjectionCard`s. Each card shows title + blurb. Ready cards show a primary "Configure" button linking to the sub-route. Coming-soon cards show a muted "Coming soon" badge and are themselves clickable (linking to the stub).
+A simple grid of three `ProjectionCard`s. Each card shows title + blurb (e.g. "HELOC" / "Borrow against home equity to invest."). Ready cards show a primary "Configure" button linking to the sub-route. Coming-soon cards show a muted "Coming soon" badge and are themselves clickable (linking to the stub).
 
 ### Stub pages
 
