@@ -25,7 +25,11 @@ import { Bundles } from "./routes/Bundles";
 import { Goals } from "./routes/Goals";
 import { Debt } from "./routes/Debt";
 import { Investments } from "./routes/Investments";
-import { Projections } from "./routes/Projections";
+import { ProjectionsLayout } from "./routes/projections/_shell/ProjectionsLayout";
+import { ProjectionsIndex } from "./routes/projections/_shell/ProjectionsIndex";
+import { Heloc } from "./routes/projections/heloc/Heloc";
+import { Retirement } from "./routes/projections/retirement/Retirement";
+import { Mortgage } from "./routes/projections/mortgage/Mortgage";
 import "./index.css";
 
 const router = createBrowserRouter([
@@ -41,7 +45,16 @@ const router = createBrowserRouter([
       { path: "goals", element: <Goals /> },
       { path: "debt", element: <Debt /> },
       { path: "investments", element: <Investments /> },
-      { path: "projections", element: <Projections /> },
+      {
+        path: "projections",
+        element: <ProjectionsLayout />,
+        children: [
+          { index: true, element: <ProjectionsIndex /> },
+          { path: "heloc", element: <Heloc /> },
+          { path: "retirement", element: <Retirement /> },
+          { path: "mortgage", element: <Mortgage /> },
+        ],
+      },
     ],
   },
 ]);
