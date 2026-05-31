@@ -143,8 +143,11 @@ export function StackedSnapshotChart({
           </div>
         </div>
       <svg
-        width={width}
+        width="100%"
         height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ maxWidth: width }}
         className="block"
         onMouseLeave={() => setHoverIdx(null)}
       >
@@ -225,7 +228,8 @@ export function StackedSnapshotChart({
             const rect = (
               e.currentTarget as SVGRectElement
             ).getBoundingClientRect();
-            const px = e.clientX - rect.left - PAD.l;
+            const scale = rect.width > 0 ? width / rect.width : 1;
+            const px = (e.clientX - rect.left) * scale - PAD.l;
             const idx = Math.floor(px / barW);
             if (idx >= 0 && idx < n) setHoverIdx(idx);
           }}

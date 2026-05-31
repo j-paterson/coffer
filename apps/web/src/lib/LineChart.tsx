@@ -80,7 +80,7 @@ export function LineChart({
     return (
       <div
         className="flex items-center justify-center rounded-lg border border-stone-200 bg-white text-sm text-stone-400"
-        style={{ width, height }}
+        style={{ width: "100%", maxWidth: width, height }}
       >
         no data
       </div>
@@ -259,14 +259,20 @@ export function LineChart({
   return (
     <svg
       ref={svgRef}
-      width={width}
+      width="100%"
       height={height}
       viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="xMidYMid meet"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseLeave}
-      style={{ userSelect: "none", cursor: drag ? "ew-resize" : "crosshair" }}
+      style={{
+        userSelect: "none",
+        cursor: drag ? "ew-resize" : "crosshair",
+        maxWidth: width,
+        display: "block",
+      }}
     >
       {/* Grid */}
       {[0, 0.25, 0.5, 0.75, 1].map((t, i) => {
