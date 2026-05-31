@@ -169,6 +169,79 @@ route.delete("/:id", (c) => {
   return c.json({ ok: true });
 });
 
+// Inline home / mortgage setup so users can configure Projections without
+// importing from an external aggregator. Upserts a manual real-estate
+// account that detectHome() finds; optionally creates a paired mortgage
+// account + debt_terms row that detectMortgage() picks up via display_name.
+route.post("/home", async (c) => {
+  const ctx = c.get("ctx") as Ctx;
+  const body = (await c.req.json()) as {
+    homeValue: number;
+    mortgage?: { balance: number; apr: number; monthlyPayment?: number };
+  };
+  if (!Number.isFinite(body.homeValue) || body.homeValue <= 0) {
+    return c.json({ error: "homeValue must be a positive number" }, 400);
+  }
+  if (body.mortgage) {
+    const { balance, apr } = body.mortgage;
+    if (!Number.isFinite(balance) || balance < 0) {
+      return c.json({ error: "mortgage balance must be a non-negative number" }, 400);
+    }
+    if (!Number.isFinite(apr) || apr < 0 || apr > 1) {
+      return c.json({ error: "mortgage apr must be a decimal between 0 and 1" }, 400);
+    }
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  ctx.db.transaction(() => {
+    ctx.db
+      .prepare(
+        `INSERT INTO accounts (id, display_name, institution, type, mode, active)
+         VALUES ('manual:property:home', 'Primary residence', 'Manual', 'real_estate', 'manual', 1)
+         ON CONFLICT(id) DO UPDATE SET active = 1, merged_into = NULL`,
+      )
+      .run();
+    ctx.db
+      .prepare(
+        `INSERT INTO balance_assertions (account_id, as_of, expected_usd, source)
+         VALUES ('manual:property:home', ?, ?, 'manual')
+         ON CONFLICT(account_id, as_of, source) DO UPDATE SET expected_usd = excluded.expected_usd`,
+      )
+      .run(today, body.homeValue);
+    if (body.mortgage) {
+      ctx.db
+        .prepare(
+          `INSERT INTO accounts (id, display_name, institution, type, mode, active)
+           VALUES ('manual:mortgage:home', 'Home Mortgage', 'Manual', 'manual', 'manual', 1)
+           ON CONFLICT(id) DO UPDATE SET active = 1, merged_into = NULL`,
+        )
+        .run();
+      ctx.db
+        .prepare(
+          `INSERT INTO balance_assertions (account_id, as_of, expected_usd, source)
+           VALUES ('manual:mortgage:home', ?, ?, 'manual')
+           ON CONFLICT(account_id, as_of, source) DO UPDATE SET expected_usd = excluded.expected_usd`,
+        )
+        .run(today, -Math.abs(body.mortgage.balance));
+      const minPmtPct =
+        body.mortgage.monthlyPayment && body.mortgage.balance > 0
+          ? body.mortgage.monthlyPayment / body.mortgage.balance
+          : 0.005;
+      ctx.db
+        .prepare(
+          `INSERT INTO debt_terms (account_id, apr, min_payment_pct, min_payment_floor)
+           VALUES ('manual:mortgage:home', ?, ?, 0)
+           ON CONFLICT(account_id) DO UPDATE SET
+             apr = excluded.apr,
+             min_payment_pct = excluded.min_payment_pct,
+             min_payment_floor = excluded.min_payment_floor,
+             updated_at = CURRENT_TIMESTAMP`,
+        )
+        .run(body.mortgage.apr, minPmtPct);
+    }
+  })();
+  return c.json({ ok: true });
+});
+
 route.post("/tax-profile", async (c) => {
   const ctx = c.get("ctx") as Ctx;
   const body = (await c.req.json()) as any;

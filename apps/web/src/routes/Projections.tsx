@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useScenario } from "./projections/useScenario";
 import { LoanCard } from "./projections/LoanCard";
 import { MarketCard } from "./projections/MarketCard";
@@ -9,16 +10,16 @@ import { HeadlineCards } from "./projections/HeadlineCards";
 import { NetWorthChart } from "./projections/NetWorthChart";
 import { DeltaChart } from "./projections/DeltaChart";
 import { TaxProfileModal } from "./projections/TaxProfileModal";
+import { HomeSetupModal } from "./projections/HomeSetupModal";
 import { SaveScenarioBar } from "./projections/SaveScenarioBar";
 import { AdvisorPanel } from "./projections/AdvisorPanel";
 
 export function Projections() {
   const { prefill, scenario, setScenario, runResult, isPending } = useScenario();
+  const qc = useQueryClient();
 
   if (prefill && !prefill.ok && prefill.requiresHome) {
-    return (
-      <EmptyState title="Home not found" message="Add your home as a manual account in Kubera so the sandbox can use it." />
-    );
+    return <HomeSetupModal onSaved={() => qc.invalidateQueries({ queryKey: ["prefill"] })} />;
   }
   if (prefill && !prefill.ok && prefill.requiresTaxProfile) {
     return <TaxProfileModal onSaved={() => window.location.reload()} onCancel={() => {}} />;
@@ -52,17 +53,6 @@ export function Projections() {
           <AdvisorPanel scenario={scenario} runResult={runResult} />
           {isPending && <div className="text-xs text-stone-400">recomputing…</div>}
         </section>
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({ title, message }: { title: string; message: string }) {
-  return (
-    <div className="flex flex-1 items-center justify-center">
-      <div className="rounded-md border border-stone-200 bg-white p-6 text-center text-stone-700">
-        <div className="text-lg font-semibold">{title}</div>
-        <p className="mt-1 text-sm text-stone-500">{message}</p>
       </div>
     </div>
   );

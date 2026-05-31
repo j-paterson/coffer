@@ -213,7 +213,7 @@ export function estimateBondSleeve(db: Database): PortfolioComposition | undefin
 export function buildPrefill(db: Database): PrefillResponse {
   const home = detectHome(db);
   if (!home) {
-    return { ok: false, requiresHome: true, message: "Add your home as a manual Kubera account to use this sandbox." };
+    return { ok: false, requiresHome: true, message: "Add your home value below to use this sandbox." };
   }
   const rawTax = loadTaxProfile(db);
   if (!rawTax) {
