@@ -11,9 +11,9 @@ Endpoint: https://coins.llama.fi/chart/{coins}?start={ts}&span={N}&period=1d
   - span:   max 500 data points per request — chunked for full history
   - period: '1d' for daily
 
-Writes to asset_prices with source='defillama'. The qty-walk reader
-already prefers asset_prices over derived holdings prices, so this
-just plugs into the existing trust order.
+Writes to asset_prices with source='defillama'. Position-snapshot
+readers already prefer asset_prices over derived holdings prices, so
+this just plugs into the existing trust order.
 """
 
 from __future__ import annotations

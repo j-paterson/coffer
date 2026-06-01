@@ -444,8 +444,8 @@ def sync() -> CoinbaseDirectStats:
 def replay() -> CoinbaseDirectStats:
     """Reprocess cached Coinbase account + txn payloads from raw_events
     without hitting the API. Reads the most-recent v2 + v3 account
-    snapshots and every cached v2 txn, then re-runs the qty-walk +
-    pricing → position_snapshots.
+    snapshots and every cached v2 txn, then re-runs the pricing →
+    position_snapshots step.
 
     Use after a price-source change, a price backfill, or a positions/
     snapshot-writing logic change to refresh derived snapshots without

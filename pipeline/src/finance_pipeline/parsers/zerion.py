@@ -9,15 +9,12 @@ Covers: Ethereum, Base, Arbitrum, Polygon, Optimism, and other EVM
 chains Zerion tracks for a given address. Each (wallet_address, chain)
 pair becomes one account row, so the dashboard can show "MetaMask on
 Ethereum" and "MetaMask on Base" as distinct balances despite sharing
-the same address — which matches Kubera's model.
+the same address.
 
 Does not cover Cosmos, Solana, Sui, Near, or centralized exchanges —
-those stay on Kubera-manual snapshots until a dedicated provider is added.
+those stay on manual snapshots until a dedicated provider is added.
 
-Wallet addresses come from either:
-  - ZERION_WALLETS env var (comma-separated), OR
-  - auto-discovered from the most recent Kubera JSON export's
-    `asset[].connection.id` fields (v1 default)
+Wallet addresses come from the `ZERION_WALLETS` env var (comma-separated).
 """
 from __future__ import annotations
 
@@ -35,7 +32,6 @@ from datetime import datetime, timedelta, timezone
 from .. import events
 from .. import ledger
 from .. import positions as positions_mod
-from ..config import PROJECT_ROOT, RAW_KUBERA
 from ..db import connect
 from ..env import load_env
 
@@ -75,36 +71,14 @@ def _auth_header() -> str:
     return f"Basic {base64.b64encode(credentials).decode('ascii')}"
 
 
-def _discover_wallets_from_kubera() -> list[str]:
-    """Return the distinct EVM wallet addresses from the latest Kubera JSON."""
-    exports = sorted(RAW_KUBERA.iterdir(), reverse=True)
-    if not exports:
-        return []
-    path = exports[0] / "Financial.json"
-    if not path.exists():
-        return []
-    data = json.loads(path.read_text())
-    seen: dict[str, None] = {}
-    for asset in data.get("asset", []):
-        conn_meta = asset.get("connection") or {}
-        cid = (conn_meta.get("id") or "").strip()
-        if ETH_ADDR_RE.match(cid):
-            seen[cid.lower()] = None
-    return list(seen.keys())
-
-
-def _wallets_from_env() -> list[str] | None:
+def get_wallets() -> list[str]:
+    """Return the EVM wallet addresses to sync, from the ZERION_WALLETS env var."""
     env = load_env()
     raw = env.get("ZERION_WALLETS", "").strip()
     if not raw:
-        return None
+        return []
     addrs = [a.strip().lower() for a in raw.split(",") if a.strip()]
     return [a for a in addrs if ETH_ADDR_RE.match(a)]
-
-
-def get_wallets() -> list[str]:
-    """Return wallets to sync. Env var wins; otherwise auto-discover."""
-    return _wallets_from_env() or _discover_wallets_from_kubera()
 
 
 def _fetch_chart(
@@ -227,10 +201,9 @@ def _upsert_holding(
 @dataclass
 class ZerionRunResult:
     stats: ZerionStats
-    archived_kubera: int = 0
 
     def as_dict(self) -> dict:
-        return {**self.stats.as_dict(), "archived_kubera": self.archived_kubera}
+        return self.stats.as_dict()
 
 
 def sync(min_value_usd: float = 1.0, _emit_run_brackets: bool = True) -> ZerionStats:
@@ -251,7 +224,7 @@ def sync(min_value_usd: float = 1.0, _emit_run_brackets: bool = True) -> ZerionS
     try:
         wallets = get_wallets()
         if not wallets:
-            print("no wallets found (no ZERION_WALLETS in .env and no Kubera export)")
+            print("no wallets found (set ZERION_WALLETS in .env)")
             if _emit_run_brackets:
                 events.sync_finished(
                     run_id=run_id,
@@ -442,20 +415,9 @@ def sync(min_value_usd: float = 1.0, _emit_run_brackets: bool = True) -> ZerionS
             print(f"  {_short(addr)}  {chain:12}  +{len(points)} historical points")
         print(f"  total chart points stored: {chart_points_written}")
 
-        # Apply Kubera-derived nicknames to live Zerion accounts (only sets
-        # NULL overrides — never overwrites a manual rename).
-        nicknames_set = apply_kubera_nicknames(synced_wallets)
-        if nicknames_set:
-            print(f"\nnaming: applied {nicknames_set} Kubera nicknames to Zerion accounts")
-
-        # Archive ALL Kubera EVM crypto accounts now that Zerion is the live
-        # source for that platform.
-        archived = reconcile_kubera(synced_wallets)
-        if archived:
-            print(f"reconcile: archived {archived} Kubera EVM crypto accounts (id-matched)")
-
-        # Catch-all fallback: archive manual crypto whose name has EVM markers
-        # but whose Kubera asset_id didn't match the JSON.
+        # Archive manual crypto accounts whose display_name has EVM markers
+        # (e.g. address fragments, ENS, common wallet provider names) — Zerion
+        # is the live source for those, so manual entries are redundant.
         name_archived = reconcile_evm_by_name()
         if name_archived:
             print(f"reconcile: archived {name_archived} manual crypto accounts (name-matched EVM)")
@@ -490,137 +452,11 @@ def sync(min_value_usd: float = 1.0, _emit_run_brackets: bool = True) -> ZerionS
         raise
 
 
-# Strip address fragments and Kubera's "- Wallet"/"- Locked" tail when
-# deriving a clean nickname from a Kubera asset name.
-_ADDR_FRAGMENT_RE = re.compile(
-    r"\s*(0x[0-9a-fA-F]{2,}\.{2,3}[0-9a-fA-F]{2,}|\*\*[0-9a-zA-Z]+|0x[0-9a-fA-F]{40})\s*"
-)
-_TRAILING_TAG_RE = re.compile(r"\s*-\s*(Wallet|Locked|Reward|Vault)\s*$", re.I)
-
-
-def _clean_kubera_name(raw: str) -> str:
-    s = _ADDR_FRAGMENT_RE.sub(" ", raw)
-    s = _TRAILING_TAG_RE.sub("", s)
-    s = re.sub(r"\s+", " ", s).strip(" -·")
-    return s
-
-
-def _wallet_nicknames_from_kubera() -> dict[str, str]:
-    """Return {wallet_address_lowercase: nickname} from the latest Kubera JSON.
-
-    For each address with EVM connection.id, picks the most descriptive
-    Kubera asset name (longest, biased toward names containing wallet/
-    provider keywords), strips the address fragment, and returns the
-    cleaned nickname. Falls back to the address itself if no usable name.
-    """
-    exports = sorted(RAW_KUBERA.iterdir(), reverse=True)
-    if not exports:
-        return {}
-    path = exports[0] / "Financial.json"
-    if not path.exists():
-        return {}
-    data = json.loads(path.read_text())
-
-    by_wallet: dict[str, list[str]] = {}
-    for asset in data.get("asset", []):
-        conn_meta = asset.get("connection") or {}
-        cid = (conn_meta.get("id") or "").strip().lower()
-        if not ETH_ADDR_RE.match(cid):
-            continue
-        name = (asset.get("name") or "").strip()
-        if name:
-            by_wallet.setdefault(cid, []).append(name)
-
-    nicknames: dict[str, str] = {}
-    KEYWORDS = ("metamask", "ledger", "keplr", "phantom", "trezor", "trust", "rabby")
-    for addr, names in by_wallet.items():
-        # Prefer names containing a wallet-provider keyword; among those,
-        # the longest. Fall back to the longest name overall.
-        cleaned = sorted(
-            ((_clean_kubera_name(n), n) for n in names),
-            key=lambda x: (
-                any(kw in x[0].lower() for kw in KEYWORDS),
-                len(x[0]),
-            ),
-            reverse=True,
-        )
-        for clean_name, _orig in cleaned:
-            if clean_name:
-                nicknames[addr] = clean_name
-                break
-    return nicknames
-
-
-def reconcile_kubera(synced_wallets: set[str]) -> int:
-    """Archive ALL Kubera EVM crypto accounts when Zerion is connected.
-
-    User directive: once Zerion is the live source, any Kubera EVM crypto
-    account is either (a) one of the wallets we now sync, OR (b) a wallet
-    the user has since removed. Either way, archive — Zerion is the truth.
-
-    Non-EVM Kubera entries (Cosmos, Solana, Sui, Near, exchange spot) are
-    left untouched because Zerion doesn't cover them.
-
-    Returns the number of accounts archived.
-    """
-    if not synced_wallets:
-        # Don't archive anything if Zerion sync produced nothing this run.
-        # Avoid wiping Kubera state when the API is misconfigured.
-        return 0
-    exports = sorted(RAW_KUBERA.iterdir(), reverse=True)
-    if not exports:
-        return 0
-    path = exports[0] / "Financial.json"
-    if not path.exists():
-        return 0
-    data = json.loads(path.read_text())
-
-    # Every Kubera asset whose connection.id is an EVM address is now
-    # superseded — regardless of whether THAT specific address is in our
-    # current Zerion sync set. (User directive: assume any unsynced wallet
-    # has been deliberately removed.)
-    superseded_ids: list[str] = []
-    for asset in data.get("asset", []):
-        conn_meta = asset.get("connection") or {}
-        cid = (conn_meta.get("id") or "").strip().lower()
-        if not ETH_ADDR_RE.match(cid):
-            continue
-        asset_id = asset.get("id")
-        if asset_id:
-            superseded_ids.append(f"kubera:{asset_id}")
-
-    if not superseded_ids:
-        return 0
-
-    archived = 0
-    with connect() as conn:
-        BATCH = 500
-        for i in range(0, len(superseded_ids), BATCH):
-            chunk = superseded_ids[i : i + BATCH]
-            placeholders = ",".join("?" for _ in chunk)
-            cur = conn.execute(
-                f"""
-                UPDATE accounts
-                SET active = 0
-                WHERE id IN ({placeholders})
-                  AND mode = 'manual'
-                  AND active = 1
-                """,
-                chunk,
-            )
-            archived += cur.rowcount or 0
-    return archived
-
-
 def reconcile_evm_by_name() -> int:
-    """Catch-all: archive manual crypto accounts whose display_name screams EVM.
+    """Archive manual crypto accounts whose display_name screams EVM.
 
-    Some Kubera accounts in the DB have IDs that don't match the latest
-    JSON export's asset IDs (orphans from older exports, or composite IDs
-    with `_eth_addr` etc. suffixes). The connection.id-based reconcile
-    misses those. This name-pattern fallback catches them — Zerion is the
-    live source for everything EVM, so any manual entry whose name
-    references an EVM wallet is now redundant.
+    Zerion is the live source for everything EVM, so any manual entry whose
+    name references an EVM wallet is redundant.
     """
     EVM_PATTERNS = [
         "%0x%",                  # any account name mentioning an address fragment
@@ -679,43 +515,6 @@ def clear_zero_value_manual() -> int:
             """
         )
         return cur.rowcount or 0
-
-
-def apply_kubera_nicknames(synced_wallets: set[str]) -> int:
-    """Set display_name_override on Zerion accounts to a Kubera-derived nickname.
-
-    For each (wallet, chain) Zerion account, set the override to
-    "<Kubera nickname> · <Chain>" so the dashboard shows a recognizable
-    label instead of the raw "Base 0xb36c…1af2" auto-generated name.
-    Only writes when the override is currently NULL — preserves any
-    manual rename the user has already set in the dashboard.
-    """
-    nicknames = _wallet_nicknames_from_kubera()
-    if not nicknames:
-        return 0
-    updated = 0
-    with connect() as conn:
-        for addr in synced_wallets:
-            nickname = nicknames.get(addr)
-            if not nickname:
-                continue
-            rows = conn.execute(
-                """
-                SELECT id, institution
-                FROM accounts
-                WHERE id LIKE ? AND display_name_override IS NULL
-                """,
-                (f"zerion:%:{addr}",),
-            ).fetchall()
-            for row in rows:
-                chain = row["institution"]
-                override = f"{nickname} · {chain}"
-                conn.execute(
-                    "UPDATE accounts SET display_name_override = ? WHERE id = ?",
-                    (override, row["id"]),
-                )
-                updated += 1
-    return updated
 
 
 def print_report(stats: ZerionStats) -> None:

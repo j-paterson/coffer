@@ -25,7 +25,7 @@ Public API:
       Convenience: combine the above two for the common ingest path.
 
 Trust order (highest first) used at query time:
-  zerion-chart > zerion > alchemy > kubera > simplefin > backfill:yfinance
+  zerion-chart > zerion > alchemy > simplefin > backfill:yfinance
 
 Per-symbol price/qty source priority (different from balance-assertion
 sources).
@@ -39,13 +39,11 @@ import sqlite3
 # Higher trust = lower index. When two sources report the same position
 # at the same date, the lower-rank source's value wins at query time.
 HOLDINGS_TRUST_ORDER = [
-    # Source-of-record beats aggregators.
+    # Source-of-record beats backfills.
     "simplefin",                # institution's direct feed
     "zerion",                   # current on-chain
     "alchemy",                  # on-chain fallback
-    "kubera",                   # aggregator snapshot
     "zerion-chart",             # historical Zerion wallet chart (no per-symbol)
-    "backfill:txn-walk",        # CoinTracker-derived qty × historical price
     "backfill:zerion-fungible", # current-qty × historical Zerion fungible price
     "backfill:yfinance",        # synthesized from market prices
 ]

@@ -21,7 +21,7 @@ class BalanceRow:
     account_id: str
     as_of: str
     value_usd: float
-    source: str = "kubera"
+    source: str = "manual"
 
 
 @dataclass

@@ -6,14 +6,10 @@ chronologically per (chain, contract) accumulating quantity, then
 multiply by daily DefiLlama price → position_snapshots with
 source='alchemy-history'.
 
-Architecturally this beats CoinTracker for individual wallets:
-  - Truth comes from the chain itself, no third-party sync to keep current
-  - Captures every wallet you've ever interacted with (no allowlist)
-  - Picks up sends/receives CT missed (private wallets, complex defi)
-
-Trust order: alchemy-history sits above backfill:txn-walk so where both
-reconstruct a (wallet, symbol, date), Alchemy wins. Live observations
-(zerion / simplefin) still beat both.
+Truth comes from the chain itself — no third-party sync to keep current
+and every wallet's full history is reachable from one address. Live
+observations (zerion / simplefin) still beat this backfill where they
+overlap.
 
 Method: alchemy_getAssetTransfers with category=['erc20','external']
 (external = native ETH transfers). Paginated via pageKey. Retries on
@@ -348,7 +344,7 @@ def replay() -> AlchemyHistoryStats:
     """Reprocess cached Alchemy transfers from raw_events without hitting
     the API. Reads every alchemy-history transfer payload, regroups by
     (chain, address) parsed from the external_id, and re-runs the
-    qty-walk + pricing → position_snapshots.
+    pricing → position_snapshots step.
 
     Use after a price-source change, a price backfill, or a positions/
     snapshot-writing logic change to refresh derived snapshots without

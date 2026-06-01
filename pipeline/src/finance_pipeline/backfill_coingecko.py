@@ -3,8 +3,8 @@
 Fills the `asset_prices` table with daily USD prices from CoinGecko's
 free public API, going back as far as the user has held the asset.
 Solves the gap left by Zerion's fungible-chart endpoint (only ~1 year
-of history) so qty-walk can reconstruct per-symbol values for older
-dates.
+of history) so historical per-symbol values can be reconstructed for
+older dates.
 
 Symbol → CoinGecko ID resolution:
   1. Fetch /coins/list?include_platform=true once, cache locally.
@@ -234,8 +234,8 @@ def _fetch_history(coin_id: str, start_d: date, end_d: date) -> dict[str, float]
 
 def _symbols_to_backfill(conn: sqlite3.Connection) -> list[tuple[str, str, str, str, str]]:
     """List (symbol, chain, contract, earliest_date, latest_date) tuples
-    — every symbol we hold (from positions) plus every CoinTracker txn
-    currency, with the date range we'd need prices for."""
+    — every symbol we hold (from positions), with the date range we'd
+    need prices for."""
     out: list[tuple[str, str, str, str, str]] = []
     seen: set[tuple[str, str, str]] = set()
 
@@ -263,8 +263,7 @@ def _symbols_to_backfill(conn: sqlite3.Connection) -> list[tuple[str, str, str, 
 
 
 def backfill(days_back: int = 365 * 9) -> CoinGeckoStats:
-    """Fetch historical prices for every crypto symbol we hold. Default
-    range is 9 years (covers CoinTracker history back to 2017)."""
+    """Fetch historical prices for every crypto symbol we hold."""
     stats = CoinGeckoStats()
     today_d = date.today()
     floor_d = today_d - timedelta(days=days_back)

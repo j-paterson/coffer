@@ -1,13 +1,13 @@
 """Account reconciliation between sources.
 
-When the same real-world account exists in both Kubera (from snapshots) and
-SimpleFIN (from live sync), we want to treat the SimpleFIN version as
-canonical and archive the Kubera version so it stops contributing to net
-worth totals.
+When the same real-world account exists in both manual entries (e.g. a
+user-curated snapshot) and a live API sync, we want to treat the live
+version as canonical and archive the manual one so it stops contributing
+to net worth totals.
 
-Matching strategy (v1): strict. A Kubera account is archived when it shares
+Matching strategy (v1): strict. A manual account is archived when it shares
 BOTH a last-4-digit suffix AND a normalized institution prefix with an
-active SimpleFIN account. We prefer false negatives over false positives —
+active live account. We prefer false negatives over false positives —
 unmatched accounts remain active and the user can archive them manually.
 """
 from __future__ import annotations
@@ -43,12 +43,12 @@ NOISE_WORDS = {
 
 @dataclass
 class ReconcileMatch:
-    kubera_id: str
-    kubera_name: str
-    kubera_type: str
-    simplefin_id: str
-    simplefin_name: str
-    simplefin_type: str
+    manual_id: str
+    manual_name: str
+    manual_type: str
+    live_id: str
+    live_name: str
+    live_type: str
     matched_on: str  # e.g. "suffix=8166, inst=chase"
 
 
@@ -81,8 +81,8 @@ def _extract_keywords(name: str) -> set[str]:
 
 
 # Account type macro-groups. Used to decide whether to trust the user's
-# manual type (from Kubera) or the live feed's auto-classified type when
-# they disagree during reconcile.
+# manual type or the live feed's auto-classified type when they disagree
+# during reconcile.
 _BANKING = frozenset({"checking", "savings"})
 _INVESTMENTS = frozenset({"brokerage", "retirement"})
 _DEBT = frozenset({"credit"})
@@ -101,7 +101,7 @@ def _choose_type(manual_type: str, live_type: str) -> str:
 
     When the user's manual classification and the live feed disagree:
       - Different macro-groups (e.g. checking vs brokerage): trust the
-        manual type. SimpleFIN's keyword heuristic gets the high-level
+        manual type. The live feed's keyword heuristic gets the high-level
         bucket wrong more often than the user does.
       - Same macro-group, retirement involved: pick retirement. IRAs
         are retirement regardless of which side flagged it.
@@ -119,8 +119,8 @@ def _choose_type(manual_type: str, live_type: str) -> str:
 def _suffix_matches(a: str | None, b: str | None) -> bool:
     """One suffix ends with the other (end-aligned), min 3 chars on both.
 
-    Catches the common case where Kubera shows "...9942" and SimpleFIN
-    shows "...942" for the same real-world account.
+    Catches the common case where a manual entry shows "...9942" and the
+    live feed shows "...942" for the same real-world account.
     """
     if not a or not b or len(a) < 3 or len(b) < 3:
         return False
@@ -130,11 +130,11 @@ def _suffix_matches(a: str | None, b: str | None) -> bool:
 def find_matches(conn: sqlite3.Connection) -> list[ReconcileMatch]:
     """Find manual accounts that are superseded by a live-mode account.
 
-    Matching runs across account types deliberately: SimpleFIN's type
-    classification is a heuristic keyword match on the account name, so
-    e.g. a Schwab "Investor Checking" can end up typed as brokerage. The
-    manual (Kubera) entry might have the correct type, and the goal of
-    reconcile is to merge them regardless of the section mismatch.
+    Matching runs across account types deliberately: the live feed's
+    type classification is a heuristic keyword match on the account
+    name, so e.g. a Schwab "Investor Checking" can end up typed as
+    brokerage. The manual entry might have the correct type, and the
+    goal of reconcile is to merge them regardless of the section mismatch.
     """
     conn.row_factory = sqlite3.Row
     live_rows = conn.execute(
@@ -172,12 +172,12 @@ def find_matches(conn: sqlite3.Connection) -> list[ReconcileMatch]:
             if _suffix_matches(sf_suffix, _extract_suffix(k["display_name"])):
                 matches.append(
                     ReconcileMatch(
-                        kubera_id=k["id"],
-                        kubera_name=k["display_name"],
-                        kubera_type=k["type"],
-                        simplefin_id=sf["id"],
-                        simplefin_name=sf["display_name"],
-                        simplefin_type=sf["type"],
+                        manual_id=k["id"],
+                        manual_name=k["display_name"],
+                        manual_type=k["type"],
+                        live_id=sf["id"],
+                        live_name=sf["display_name"],
+                        live_type=sf["type"],
                         matched_on=f"suffix={sf_suffix}, inst={sf_inst}",
                     )
                 )
@@ -206,12 +206,12 @@ def find_matches(conn: sqlite3.Connection) -> list[ReconcileMatch]:
             if len(overlap) >= 1:
                 matches.append(
                     ReconcileMatch(
-                        kubera_id=k["id"],
-                        kubera_name=k["display_name"],
-                        kubera_type=k["type"],
-                        simplefin_id=sf["id"],
-                        simplefin_name=sf["display_name"],
-                        simplefin_type=sf["type"],
+                        manual_id=k["id"],
+                        manual_name=k["display_name"],
+                        manual_type=k["type"],
+                        live_id=sf["id"],
+                        live_name=sf["display_name"],
+                        live_type=sf["type"],
                         matched_on=f"keywords={sorted(overlap)}",
                     )
                 )
@@ -226,8 +226,8 @@ def find_matches(conn: sqlite3.Connection) -> list[ReconcileMatch]:
     #     Brokerage entry the user just hasn't synced yet
     # The sole-pair pass is otherwise dangerous: the user might have a real
     # account at an institution that simply isn't in the live feed yet, and
-    # blindly pairing would silently archive a real Kubera entry.
-    matched_live_ids: set[str] = {m.simplefin_id for m in matches}
+    # blindly pairing would silently archive a real manual entry.
+    matched_live_ids: set[str] = {m.live_id for m in matches}
     by_inst_live: dict[str, list[sqlite3.Row]] = {}
     by_inst_manual: dict[str, list[sqlite3.Row]] = {}
     for sf in live_rows:
@@ -251,12 +251,12 @@ def find_matches(conn: sqlite3.Connection) -> list[ReconcileMatch]:
             continue
         matches.append(
             ReconcileMatch(
-                kubera_id=k["id"],
-                kubera_name=k["display_name"],
-                kubera_type=k["type"],
-                simplefin_id=sf["id"],
-                simplefin_name=sf["display_name"],
-                simplefin_type=sf["type"],
+                manual_id=k["id"],
+                manual_name=k["display_name"],
+                manual_type=k["type"],
+                live_id=sf["id"],
+                live_name=sf["display_name"],
+                live_type=sf["type"],
                 matched_on=f"sole-pair@{inst}",
             )
         )
@@ -270,9 +270,9 @@ def apply_matches(conn: sqlite3.Connection, matches: list[ReconcileMatch]) -> in
 
     Triggered when a live sync covers the same real-world account as a
     manual entry. Also inherits the manual entry's `type` onto the live
-    account when they differ — SimpleFIN's type heuristic mis-classifies
-    (e.g. Schwab "Investor Checking" as brokerage), so a matching
-    user-curated Kubera type is a trusted correction.
+    account when they differ — the live feed's type heuristic
+    mis-classifies (e.g. Schwab "Investor Checking" as brokerage), so a
+    matching user-curated manual type is a trusted correction.
 
     Deletes every child row in every table with an FK to accounts, then
     the account itself. Self-referential merged_into pointers are NULLed
@@ -286,15 +286,15 @@ def apply_matches(conn: sqlite3.Connection, matches: list[ReconcileMatch]) -> in
     # Reconcile the type on the live account: if the manual and live
     # types disagree, pick via macro-group heuristic. See _choose_type.
     for m in matches:
-        if m.kubera_type and m.simplefin_type and m.kubera_type != m.simplefin_type:
-            chosen = _choose_type(m.kubera_type, m.simplefin_type)
-            if chosen != m.simplefin_type:
+        if m.manual_type and m.live_type and m.manual_type != m.live_type:
+            chosen = _choose_type(m.manual_type, m.live_type)
+            if chosen != m.live_type:
                 conn.execute(
                     "UPDATE accounts SET type = ? WHERE id = ? AND mode = 'live'",
-                    (chosen, m.simplefin_id),
+                    (chosen, m.live_id),
                 )
 
-    ids = [m.kubera_id for m in matches]
+    ids = [m.manual_id for m in matches]
     placeholders = ",".join("?" for _ in ids)
 
     # Null out self-ref merged_into before deleting — an archived account
@@ -325,16 +325,16 @@ def apply_matches(conn: sqlite3.Connection, matches: list[ReconcileMatch]) -> in
 
 # ---------- transaction-level cross-source dedup -------------------------
 #
-# The same real-world charge is often observed by multiple sources — e.g. a
-# Chase credit-card purchase appears both in the user's monthly statement
-# CSV (`chase-statement`) and in the SimpleFIN feed (`simplefin`), with
-# slightly different dates (pending vs. posted) and descriptions of varying
-# detail. Without dedup, both land as distinct ``transactions_v2`` rows,
-# double-counting in spending totals and splitting receipt matches.
+# The same real-world charge can be observed by multiple sources — e.g. a
+# credit-card purchase observed both via the live bank feed and via a
+# secondary feed of the same account, with slightly different dates
+# (pending vs. posted) and descriptions of varying detail. Without dedup,
+# both land as distinct ``transactions_v2`` rows, double-counting in
+# spending totals and splitting receipt matches.
 #
 # The safety invariant that keeps this heuristic honest: we only collapse
 # txns whose supporting ``raw_events`` come from *different* source
-# providers. A same-source pair (two separate SimpleFIN TRN ids observed
+# providers. A same-source pair (two separate provider TRN ids observed
 # on the same day at the same amount to the same payee) is a legitimate
 # repeat charge (two $450 Zelles to the same friend, etc.) and must be
 # preserved. The stable provider external_id is the ground truth for
@@ -476,7 +476,7 @@ def find_duplicate_clusters(
     # Second safety pass: within a cluster, every source provider must
     # appear at most once. Union-find can transitively rope two
     # same-source rows into the same cluster via a shared cross-source
-    # partner (e.g. two SimpleFIN Zelles both tied to one Schwab row —
+    # partner (e.g. two live-feed Zelles both tied to one statement row —
     # the Zelles are legitimate separate payments and must survive).
     clusters: list[list[int]] = []
     for members in groups.values():

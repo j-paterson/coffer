@@ -51,10 +51,6 @@ class ValidationReport:
 # in the validator so we focus on sources we actually trust.
 _TRUSTED_SOURCES = (
     "manual",
-    "chase-statement",
-    "masterworks-k1",
-    "kubera-recap",
-    "kubera",
     "simplefin",
     "zerion-chart",
     "zerion",
