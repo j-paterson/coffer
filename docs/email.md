@@ -25,7 +25,7 @@ the database — there is no hallucination path.
 
 ## Prerequisites
 
-### 3.1 The `[email]` Python extras group
+### The `[email]` Python extras group
 
 Install the pipeline with the email extras:
 
@@ -39,7 +39,7 @@ The `[email]` group adds five packages that are not needed for the core pipeline
 `beautifulsoup4`, and `pdfplumber`. Without them, `finance sync email` and
 `finance extract-email` will fail with a `ModuleNotFoundError` on import.
 
-### 3.2 Ollama running locally with NuExtract
+### Ollama running locally with NuExtract
 
 Ollama is a local model server. You need it running with the `nuextract:3.8b`
 model pulled before `finance extract-email` will work.
@@ -69,7 +69,7 @@ By default Coffer talks to `http://localhost:11434/api/generate` using the
 Add overrides to your `.env` file if you run Ollama on a different host or
 want to try a different NuExtract variant.
 
-### 3.3 Gmail OAuth client credential
+### Gmail OAuth client credential
 
 Coffer reads your Gmail using the Gmail API with an installed-app OAuth flow.
 Credentials are stored in `.secrets/` (gitignored).
