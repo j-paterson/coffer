@@ -22,7 +22,6 @@ async function main() {
     case "symbol":    return (await import("./symbol")).run(rest);
     case "source":    return (await import("./source")).run(rest);
     case "gaps":      return (await import("./gaps")).run(rest);
-    case "kubera-check": return (await import("./kubera-check")).run(rest);
     case "composition": return (await import("./composition")).run(rest);
     case undefined:
     case "-h":
