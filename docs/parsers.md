@@ -155,6 +155,8 @@ Config keys:
   values (the default 24h is appropriate) reduce repeat calls.
 - Positions below `min_value_usd` are filtered before any chain grouping,
   so dust balances don't generate accounts or price lookups.
+- Empty `wallets` produces no output and no warning — if a sync completes
+  silently with no data, double-check that `wallets` is populated.
 
 ---
 
@@ -218,6 +220,8 @@ Config keys:
 - The parser only emits an account and its positions if at least one
   non-zero position is found on a given chain. Empty wallets on a chain
   produce no output.
+- Empty `wallets` produces no output and no warning — if a sync completes
+  silently with no data, double-check that `wallets` is populated.
 
 ---
 
@@ -239,7 +243,7 @@ Create a **CDP API key** (not the legacy API key) at
 
 ```env
 COINBASE_KEY_NAME=organizations/abc123/apiKeys/def456
-COINBASE_PRIVATE_KEY="-----BEGIN EC PRIVATE KEY-----\nMHQCAQEEI...\n-----END EC PRIVATE KEY-----\n"
+COINBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49...\n-----END PRIVATE KEY-----\n"
 ```
 
 ### Config block
@@ -292,9 +296,12 @@ Built-in `chain_map` defaults: `BTC→bitcoin`, `ETH→ethereum`, `USDC→ethere
 
 ### Gotchas
 
-- The private key must be a **PEM-encoded EC key** (not RSA, not a hex
-  string). In `.env`, literal newlines inside the PEM block must be
-  encoded as `\n` since `.env` files are single-line per variable.
+- The private key must be **PKCS8 format** (`-----BEGIN PRIVATE KEY-----`),
+  not SEC1 (`-----BEGIN EC PRIVATE KEY-----`). The CDP dashboard gives you
+  PKCS8 by default; if you generated the key with `openssl ecparam`, convert
+  it with `openssl pkcs8 -topk8 -nocrypt -in sec1.pem -out pkcs8.pem`.
+  In `.env`, literal newlines inside the PEM block must be encoded as `\n`
+  since `.env` files are single-line per variable.
 - If a currency has no chain mapping (built-in or via `chain_map`), the
   parser emits a `sync_warning` with scope `unknown_currency` and skips
   position snapshots for that wallet.
