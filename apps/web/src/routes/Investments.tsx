@@ -582,7 +582,7 @@ export function Investments() {
                     ? "text-emerald-700"
                     : "text-rose-700"
                 }`}
-                title="Lifetime realized P&L (CoinTracker disposals + manual write-downs)"
+                title="Lifetime realized P&L from manual write-downs"
               >
                 {holdingsQ.data.totals.realized_pnl >= 0 ? "+" : ""}
                 {formatUsd(holdingsQ.data.totals.realized_pnl)} realized
@@ -626,13 +626,11 @@ export function Investments() {
                     const sourceBadge =
                       h.basis_source === "manual"
                         ? { label: "manual", cls: "text-sky-600" }
-                        : h.basis_source === "cointracker-fifo"
-                          ? { label: "CoinTracker", cls: "text-stone-400" }
-                          : h.basis_source === "stablecoin"
-                            ? { label: "stable", cls: "text-stone-400" }
-                            : h.basis_source === "simplefin"
-                              ? { label: "SimpleFIN", cls: "text-stone-400" }
-                              : null;
+                        : h.basis_source === "stablecoin"
+                          ? { label: "stable", cls: "text-stone-400" }
+                          : h.basis_source === "simplefin"
+                            ? { label: "SimpleFIN", cls: "text-stone-400" }
+                            : null;
                     const symbolTrades = tradesBySymbol.get(h.symbol) ?? [];
                     const hasTrades = symbolTrades.length > 0;
                     const isExpanded = expandedPositions.has(rowKey);
@@ -745,14 +743,6 @@ export function Investments() {
                               <div className="flex items-center justify-end gap-2">
                                 <div>
                                   {fmt.amount(h.cost_basis)}
-                                  {h.basis_coverage != null && (
-                                    <div
-                                      className="text-xs text-amber-600"
-                                      title={`CoinTracker FIFO covers ${(h.basis_coverage * 100).toFixed(0)}% of the live qty — remainder came from sources CoinTracker doesn't see.`}
-                                    >
-                                      partial ({(h.basis_coverage * 100).toFixed(0)}%)
-                                    </div>
-                                  )}
                                   {sourceBadge && (
                                     <div className={`text-xs ${sourceBadge.cls}`}>
                                       {sourceBadge.label}
@@ -780,7 +770,7 @@ export function Investments() {
                                         onClick={() => {
                                           if (
                                             window.confirm(
-                                              `Remove manual basis override for ${h.symbol}? Basis will fall back to CoinTracker FIFO (or blank if unavailable).`,
+                                              `Remove manual basis override for ${h.symbol}? Basis will become blank for this holding.`,
                                             )
                                           ) {
                                             deleteOverride.mutate(overrideId);

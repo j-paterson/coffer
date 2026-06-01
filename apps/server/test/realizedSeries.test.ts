@@ -33,7 +33,7 @@ function ev(date: string, realized_pnl: number): RealizedPnlEvent {
     date,
     currency: "X",
     realized_pnl,
-    source: "cointracker",
+    source: "manual",
     type: "TRADE",
     description: "",
   };

@@ -117,9 +117,9 @@ export function walkSeveralCanonicals(
     m.set(r.date, (m.get(r.date) ?? 0) + r.delta);
   }
 
-  // Only consider assertions from enabled sources, so toggling
-  // kubera-recap (or any other source) off via `finance sources toggle`
-  // immediately removes those anchors from the walk.
+  // Only consider assertions from enabled sources, so toggling a source
+  // off via `finance sources toggle` immediately removes those anchors
+  // from the walk.
   const enabledAssertSources = enabledSources(ctx, "assertion");
   const assertSrcPh = enabledAssertSources.map(() => "?").join(",");
   const assertions = enabledAssertSources.length

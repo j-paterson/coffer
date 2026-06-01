@@ -133,10 +133,10 @@ describe("postTransaction", () => {
       date: "2025-01-15",
       description: "Imported",
       postings: [posting("acct:a", -5.0), posting("acct:b", 5.0)],
-      derived_by: "kubera-recap",
+      derived_by: "manual-import",
     });
     const row = db.query("SELECT derived_by FROM transactions_v2 WHERE id = ?")
       .get(txnId) as { derived_by: string };
-    expect(row.derived_by).toBe("kubera-recap");
+    expect(row.derived_by).toBe("manual-import");
   });
 });

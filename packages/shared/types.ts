@@ -36,7 +36,6 @@ export const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
 
 export type BalanceSource =
   | "simplefin"
-  | "kubera"
   | "manual"
   | "postings-v2"
   | "positions-mark-to-market"
@@ -48,7 +47,7 @@ export type AccountMode = "live" | "manual";
 export interface Account {
   id: string;
   display_name: string;
-  /** User-set or Kubera-derived nickname; takes precedence over display_name when set. */
+  /** User-set nickname; takes precedence over display_name when set. */
   display_name_override: string | null;
   institution: string;
   type: AccountType;
@@ -348,7 +347,7 @@ export interface HoldingRow {
   /** [0,1] when basis covers only a partial share of live qty; null when full coverage or no basis. */
   basis_coverage: number | null;
   /** Which pipeline produced the basis value — drives UI badges + edit affordance. */
-  basis_source: "simplefin" | "cointracker-fifo" | "stablecoin" | "manual" | null;
+  basis_source: "simplefin" | "stablecoin" | "manual" | null;
   unrealized_pnl: number | null;
   /** Lifetime realized P&L on this canonical symbol (crypto only). */
   realized_pnl: number | null;

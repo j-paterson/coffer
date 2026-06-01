@@ -16,10 +16,10 @@ import { createTestCtx } from "../setup";
 import { loadScenario } from "../scenarios";
 import { walkSeveralCanonicals } from "@coffer/ledger/walker";
 
-describe("real_estate_with_kubera scenario", () => {
+describe("real_estate_with_manual_anchor scenario", () => {
   test("real-estate forward-fills through ctx.today (RE-only walk)", () => {
     const ctx = createTestCtx("2026-04-27");
-    loadScenario(ctx.db, "real_estate_with_kubera");
+    loadScenario(ctx.db, "real_estate_with_manual_anchor");
     const series = walkSeveralCanonicals(
       ctx,
       ["manual:property:los-ranchos-8401"],
@@ -31,7 +31,7 @@ describe("real_estate_with_kubera scenario", () => {
 
   test("real-estate forward-fills through ctx.today (full walk, no windowEnd)", () => {
     const ctx = createTestCtx("2026-04-27");
-    loadScenario(ctx.db, "real_estate_with_kubera");
+    loadScenario(ctx.db, "real_estate_with_manual_anchor");
     const canons = (ctx.db.query(
       `SELECT DISTINCT COALESCE(merged_into, id) AS canonical
        FROM accounts WHERE id NOT LIKE 'equity:%' AND active = 1`,

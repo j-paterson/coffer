@@ -20,8 +20,8 @@ beforeEach(() => {
 afterEach(() => { testDb.close(); });
 
 function seedHome(db: Database, value: number, name = "Home") {
-  db.prepare("INSERT INTO accounts (id, display_name, institution, type, mode) VALUES ('home1', ?, 'Kubera', 'real_estate', 'manual')").run(name);
-  db.prepare("INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) VALUES ('home1', '2026-04-01', ?, 'kubera')").run(value);
+  db.prepare("INSERT INTO accounts (id, display_name, institution, type, mode) VALUES ('home1', ?, 'manual-entry', 'real_estate', 'manual')").run(name);
+  db.prepare("INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) VALUES ('home1', '2026-04-01', ?, 'manual')").run(value);
 }
 
 test("no home → requiresHome: true", () => {
@@ -54,7 +54,7 @@ test("prefill seeds ordinaryInvestmentIncomeMonthly from taxable brokerage balan
   testDb.run("INSERT INTO tax_profile (id, marginal_ordinary_rate, ltcg_rate, qualified_div_rate, ordinary_investment_income_monthly) VALUES (1, 0.37, 0.238, 0.238, 0)");
   testDb.run("INSERT INTO cashflow_settings (id, monthly_income, monthly_required_expense) VALUES (1, 15000, 9000)");
   testDb.run("INSERT INTO accounts (id, display_name, institution, type, mode) VALUES ('b1', 'Vanguard Taxable', 'Vanguard', 'brokerage', 'manual')");
-  testDb.run("INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) VALUES ('b1', '2026-04-01', 400000, 'kubera')");
+  testDb.run("INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) VALUES ('b1', '2026-04-01', 400000, 'manual')");
   const r = buildPrefill(testDb);
   if (!r.ok) throw new Error("expected prefill ok");
   expect(r.scenario.tax.ordinaryInvestmentIncomeMonthly).toBeCloseTo(400_000 * 0.015 / 12, 1);
@@ -65,7 +65,7 @@ test("prefill preserves explicit ordinaryInvestmentIncomeMonthly and skips the e
   testDb.run("INSERT INTO tax_profile (id, marginal_ordinary_rate, ltcg_rate, qualified_div_rate, ordinary_investment_income_monthly) VALUES (1, 0.37, 0.238, 0.238, 1234)");
   testDb.run("INSERT INTO cashflow_settings (id, monthly_income, monthly_required_expense) VALUES (1, 15000, 9000)");
   testDb.run("INSERT INTO accounts (id, display_name, institution, type, mode) VALUES ('b1', 'Vanguard Taxable', 'Vanguard', 'brokerage', 'manual')");
-  testDb.run("INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) VALUES ('b1', '2026-04-01', 400000, 'kubera')");
+  testDb.run("INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) VALUES ('b1', '2026-04-01', 400000, 'manual')");
   const r = buildPrefill(testDb);
   if (!r.ok) throw new Error("expected prefill ok");
   expect(r.scenario.tax.ordinaryInvestmentIncomeMonthly).toBe(1234);
@@ -76,7 +76,7 @@ test("mortgage detected via display_name match", () => {
   testDb.run("INSERT INTO tax_profile (id, marginal_ordinary_rate, ltcg_rate, qualified_div_rate) VALUES (1, 0.37, 0.238, 0.238)");
   testDb.run("INSERT INTO cashflow_settings (id, monthly_income, monthly_required_expense) VALUES (1, 15000, 9000)");
   testDb.run("INSERT INTO accounts (id, display_name, institution, type, mode) VALUES ('m1', 'Mortgage - Main', 'Chase', 'manual', 'manual')");
-  testDb.run("INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) VALUES ('m1', '2026-04-01', -400000, 'kubera')");
+  testDb.run("INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) VALUES ('m1', '2026-04-01', -400000, 'manual')");
   testDb.run("INSERT INTO debt_terms (account_id, apr, min_payment_pct, min_payment_floor) VALUES ('m1', 0.03, 0.01, 0)");
   const r = buildPrefill(testDb);
   if (!r.ok) throw new Error("expected ok");
@@ -90,7 +90,7 @@ test("mortgage detected via display_name match", () => {
 
 function seedTaxableBrokerage(db: Database, id: string, name: string, balance: number) {
   db.prepare("INSERT INTO accounts (id, display_name, institution, type, mode) VALUES (?, ?, 'Vanguard', 'brokerage', 'manual')").run(id, name);
-  db.prepare("INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) VALUES (?, '2026-04-01', ?, 'kubera')").run(id, balance);
+  db.prepare("INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) VALUES (?, '2026-04-01', ?, 'manual')").run(id, balance);
 }
 
 test("estimateBondSleeve: no bond accounts → undefined", () => {
@@ -145,7 +145,7 @@ test("buildPrefill: no bond holdings → scenario.composition undefined", () => 
 test("estimateBondSleeve: display_name_override takes precedence over display_name", () => {
   // display_name has no bond signal, but display_name_override does → should be detected
   testDb.run("INSERT INTO accounts (id, display_name, display_name_override, institution, type, mode) VALUES ('b1', 'Generic Account', 'VGIT Treasury Bond', 'Vanguard', 'brokerage', 'manual')");
-  testDb.run("INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) VALUES ('b1', '2026-04-01', 40000, 'kubera')");
+  testDb.run("INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) VALUES ('b1', '2026-04-01', 40000, 'manual')");
   seedTaxableBrokerage(testDb, "eq1", "Vanguard Total Stock Market", 60_000);
   const result = estimateBondSleeve(testDb);
   expect(result).not.toBeUndefined();
