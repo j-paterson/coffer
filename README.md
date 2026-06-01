@@ -18,6 +18,12 @@ Coinbase, Zerion, Alchemy, DefiLlama, GeckoTerminal).
 - **Investment tracking** — holdings, cost basis, realized P&L
 - **Privacy mode** — blur all amounts for screen sharing
 
+## Screenshots
+
+![Net worth chart](docs/screenshots/networth.png)
+![Spending breakdown](docs/screenshots/spending.png)
+![Investments](docs/screenshots/investments.png)
+
 ## Prerequisites
 
 - [Bun](https://bun.sh) v1.1+
