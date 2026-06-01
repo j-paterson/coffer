@@ -158,38 +158,6 @@ test("required-spend: old txns outside 90-day window are excluded", async () => 
   expect(body.detected_monthly_required).toBeCloseTo(60 / 3, 1);
 });
 
-// ─── cointracker txns excluded from both queries ──────────────────────────────
-
-test("required-spend: cointracker txns are excluded", async () => {
-  // cointracker txn — should be excluded
-  db.prepare(
-    `INSERT INTO transactions_v2 (date, description, derived_by) VALUES ('2026-04-02', 'BTC Buy', 'cointracker')`,
-  ).run();
-  const coinId = (db.prepare(`SELECT last_insert_rowid() AS id`).get() as { id: number }).id;
-  db.prepare(`INSERT INTO postings (txn_id, account_id, amount) VALUES (?, 'acct:chk', -500)`).run(coinId);
-  db.prepare(`INSERT INTO postings (txn_id, account_id, amount) VALUES (?, 'equity:unknown-counterparty', 500)`).run(coinId);
-  db.prepare(
-    `INSERT INTO transaction_items (line_no, name, line_total, category, transaction_v2_id) VALUES (1, 'BTC', -500, 'Groceries', ?)`,
-  ).run(coinId);
-
-  // Normal txn
-  seedTxn(db, {
-    date: "2026-04-01",
-    description: "Real Groceries",
-    postingAmount: -100,
-    items: [{ category: "Groceries", line_total: -100 }],
-  });
-
-  const app = makeApp(db);
-  const res = await app.request("/api/cashflow");
-  expect(res.status).toBe(200);
-
-  const body = (await res.json()) as CashflowResponse;
-  // Only the $100 normal txn should count
-  expect(body.detected_monthly_required).toBeCloseTo(100 / 3, 1);
-  expect(body.detected_monthly_required).toBeLessThan(200);
-});
-
 // ─── Non-required categories don't pollute required-spend ────────────────────
 
 test("required-spend: non-required category txns are not counted", async () => {

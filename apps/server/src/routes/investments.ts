@@ -10,16 +10,9 @@ import type {
   InvestmentFlowRow,
   BasisOverride,
 } from "../../../../packages/shared/types";
-import {
-  computeCryptoBasisFifo,
-  matchBasisToHolding,
-} from "../lib/cost-basis";
 import { canonicalSymbol } from "../lib/symbolAliases";
 import {
-  COINTRACKER_DATE_EXPR,
-  REALIZED_DISPOSAL_FILTER_SQL,
   buildRealizedSeries,
-  cointrackerRealizedEvents,
   manualRealizedLosses,
   realizedPnlEvents,
 } from "../lib/realizedPnl";
@@ -256,57 +249,17 @@ route.get("/flows", (c) => {
 
 route.get("/cost-basis", (c) => {
   const ctx = c.get("ctx") as Ctx;
-  const stablecoinFilter = "NOT IN ('USDC','USDT','DAI','BUSD','USD')";
 
-  const cryptoBuys = ctx.db
-    .prepare(
-      `SELECT currency, SUM(txn_count) AS txn_count,
-              SUM(total_cost_basis) AS total_cost_basis,
-              SUM(total_qty) AS total_qty
-       FROM (
-         SELECT json_extract(payload, '$.Received Currency') AS currency,
-                COUNT(*) AS txn_count,
-                SUM(CAST(json_extract(payload, '$.Received Cost Basis (USD)') AS REAL)) AS total_cost_basis,
-                SUM(CAST(json_extract(payload, '$.Received Quantity') AS REAL)) AS total_qty
-         FROM raw_events
-         WHERE source = 'cointracker'
-           AND json_extract(payload, '$.Type') IN ('BUY', 'TRADE', 'MULTI_TOKEN_TRADE')
-           AND json_extract(payload, '$.Received Currency') ${stablecoinFilter}
-         GROUP BY json_extract(payload, '$.Received Currency')
-       )
-       GROUP BY currency
-       ORDER BY total_cost_basis DESC`,
-    )
-    .all() as Array<{
-      currency: string;
-      txn_count: number;
-      total_cost_basis: number;
-      total_qty: number;
-    }>;
-
-  // Per-currency breakdown of the canonical realized-P&L stream. The
-  // CoinTracker portion groups by Sent Currency; manual write-downs
-  // aren't tied to a specific disposed asset and land under a "MANUAL"
-  // bucket so the breakdown sums exactly to totals.crypto_realized_return.
-  const cointrackerByCurrency = ctx.db
-    .prepare(
-      `SELECT json_extract(payload, '$.Sent Currency') AS currency,
-              COUNT(*) AS txn_count,
-              SUM(CAST(json_extract(payload, '$.Sent Cost Basis (USD)') AS REAL)) AS total_cost_basis,
-              SUM(CAST(json_extract(payload, '$.Realized Return (USD)') AS REAL)) AS realized_return
-       FROM raw_events
-       WHERE ${REALIZED_DISPOSAL_FILTER_SQL}
-       GROUP BY json_extract(payload, '$.Sent Currency')`,
-    )
-    .all() as Array<{
-      currency: string;
-      txn_count: number;
-      total_cost_basis: number;
-      realized_return: number;
-    }>;
-
+  // Realized-P&L breakdown: manual write-downs aren't tied to a specific
+  // disposed asset and land under a "MANUAL" bucket so the breakdown
+  // sums exactly to totals.crypto_realized_return.
   const manualLosses = manualRealizedLosses(ctx);
-  const cryptoSells: typeof cointrackerByCurrency = [...cointrackerByCurrency];
+  const cryptoSells: Array<{
+    currency: string;
+    txn_count: number;
+    total_cost_basis: number;
+    realized_return: number;
+  }> = [];
   if (manualLosses.length > 0) {
     cryptoSells.push({
       currency: "MANUAL",
@@ -315,7 +268,6 @@ route.get("/cost-basis", (c) => {
       realized_return: manualLosses.reduce((s, e) => s + e.realized_pnl, 0),
     });
   }
-  cryptoSells.sort((a, b) => Math.abs(b.realized_return) - Math.abs(a.realized_return));
 
   // Cost basis from position_snapshots (SimpleFIN — e.g. Vanguard)
   const snapshotBasis = ctx.db
@@ -346,19 +298,18 @@ route.get("/cost-basis", (c) => {
       as_of: string;
     }>;
 
-  const cryptoBuyTotal = cryptoBuys.reduce((s, r) => s + (r.total_cost_basis ?? 0), 0);
   const cryptoSellTotal = cryptoSells.reduce((s, r) => s + (r.realized_return ?? 0), 0);
   const snapshotBasisTotal = snapshotBasis.reduce((s, r) => s + (r.cost_basis ?? 0), 0);
 
   return c.json({
-    crypto_buys: cryptoBuys,
+    crypto_buys: [],
     crypto_sells: cryptoSells,
     snapshot_basis: snapshotBasis,
     totals: {
-      crypto_cost_basis: cryptoBuyTotal,
+      crypto_cost_basis: 0,
       crypto_realized_return: cryptoSellTotal,
       snapshot_cost_basis: snapshotBasisTotal,
-      combined_cost_basis: cryptoBuyTotal + snapshotBasisTotal,
+      combined_cost_basis: snapshotBasisTotal,
     },
   });
 });
@@ -368,81 +319,23 @@ route.get("/trades", (c) => {
   const from = c.req.query("from");
   const to = c.req.query("to");
 
-  // Share the disposal filter + date expression with realizedPnl.ts so the
-  // trades list and the realized-P&L chart decompose the same event set.
-  // Any sum of realized_pnl over a window here equals the chart's delta
-  // over that window by construction.
-  const { clause: dateClause, params: dateParams } = dateSqlClause(
-    COINTRACKER_DATE_EXPR,
-    { from, to },
-  );
-
-  const rows = ctx.db
-    .prepare(
-      /* sql */ `
-        SELECT
-          ${COINTRACKER_DATE_EXPR} AS date,
-          json_extract(payload, '$.Type') AS type,
-          json_extract(payload, '$.Sent Currency') AS sent_currency,
-          CAST(json_extract(payload, '$.Sent Quantity') AS REAL) AS sent_qty,
-          CAST(json_extract(payload, '$.Sent Cost Basis (USD)') AS REAL) AS sent_basis,
-          json_extract(payload, '$.Received Currency') AS recv_currency,
-          CAST(json_extract(payload, '$.Received Quantity') AS REAL) AS recv_qty,
-          CAST(json_extract(payload, '$.Received Cost Basis (USD)') AS REAL) AS recv_basis,
-          CAST(json_extract(payload, '$.Realized Return (USD)') AS REAL) AS realized_pnl,
-          json_extract(payload, '$.Sent Wallet') AS sent_wallet,
-          json_extract(payload, '$.Received Wallet') AS recv_wallet
-        FROM raw_events
-        WHERE ${REALIZED_DISPOSAL_FILTER_SQL}
-          ${dateClause}
-        ORDER BY date DESC
-      `,
-    )
-    .all(...dateParams) as Array<{
-      date: string;
-      type: string;
-      sent_currency: string;
-      sent_qty: number;
-      sent_basis: number;
-      recv_currency: string;
-      recv_qty: number;
-      recv_basis: number;
-      realized_pnl: number;
-      sent_wallet: string;
-      recv_wallet: string;
-    }>;
-
-  const trades = rows.map((r) => ({
-    date: r.date,
-    type: r.type,
-    sent_currency: r.sent_currency || "",
-    sent_qty: r.sent_qty || 0,
-    sent_basis: r.sent_basis || 0,
-    recv_currency: r.recv_currency || "",
-    recv_qty: r.recv_qty || 0,
-    recv_basis: r.recv_basis || 0,
-    realized_pnl: r.realized_pnl || 0,
-    wallet: r.sent_wallet || r.recv_wallet || "",
-    canonical_sent: r.sent_currency ? canonicalSymbol(r.sent_currency).toUpperCase() : "",
-    canonical_recv: r.recv_currency ? canonicalSymbol(r.recv_currency).toUpperCase() : "",
+  // Realized-P&L event list. Today the only source is manual write-downs
+  // booked to `expense:realized-loss`; sums over any window equal the
+  // realized-series chart's delta over that window by construction.
+  const trades = manualRealizedLosses(ctx, { from, to }).map((ml) => ({
+    date: ml.date,
+    type: ml.type,
+    sent_currency: ml.currency,
+    sent_qty: Math.abs(ml.realized_pnl),
+    sent_basis: Math.abs(ml.realized_pnl),
+    recv_currency: "",
+    recv_qty: 0,
+    recv_basis: 0,
+    realized_pnl: ml.realized_pnl,
+    wallet: ml.description,
+    canonical_sent: "",
+    canonical_recv: "",
   }));
-
-  for (const ml of manualRealizedLosses(ctx, { from, to })) {
-    trades.push({
-      date: ml.date,
-      type: ml.type,
-      sent_currency: ml.currency,
-      sent_qty: Math.abs(ml.realized_pnl),
-      sent_basis: Math.abs(ml.realized_pnl),
-      recv_currency: "",
-      recv_qty: 0,
-      recv_basis: 0,
-      realized_pnl: ml.realized_pnl,
-      wallet: ml.description,
-      canonical_sent: "",
-      canonical_recv: "",
-    });
-  }
 
   trades.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
@@ -506,13 +399,9 @@ route.get("/holdings", (c) => {
       cost_basis: number | null;
     }>;
 
-  // FIFO cost basis per canonical crypto symbol from CoinTracker events.
-  // Replaces a broken "sum acquired − sum disposed" formula that yielded
-  // zero for any symbol traded multiple times.
-  const fifoBasis = computeCryptoBasisFifo(ctx.db);
-
-  // User-entered overrides win over FIFO. Account-scoped rows take
-  // precedence over symbol-only rows for the same symbol.
+  // User-entered overrides supply basis for symbols without a brokerage
+  // cost_basis on the snapshot. Account-scoped rows take precedence over
+  // symbol-only rows for the same symbol.
   const overrideRows = ctx.db
     .prepare(
       `SELECT symbol, account_id, cost_usd, quantity_at_entry, note
@@ -568,21 +457,12 @@ route.get("/holdings", (c) => {
     }
   }
 
-  // Stablecoins are cash equivalents — basis ≡ face value, so unrealized
-  // P&L is always ~0. Report value as basis so the UI reflects that
-  // instead of showing "basis unknown".
-
-  // Apply FIFO cost basis for crypto holdings. `matchBasisToHolding` scales
-  // the FIFO queue's per-unit price to the live qty; when CoinTracker has
-  // fewer lots than we actually hold (missed DEX swap, external transfer
-  // in), it reports basis for the covered portion only and surfaces the
-  // coverage ratio so the UI can flag partial basis.
-  //
   // Resolution order for crypto basis: user override → stablecoin face
-  // value → FIFO. Brokerage basis comes directly from SimpleFIN on the
-  // snapshot row and isn't overridden here.
+  // value. Stablecoins report basis ≡ face value so unrealized P&L is ~0
+  // (better than showing "basis unknown"). Brokerage basis comes
+  // directly from SimpleFIN on the snapshot row and isn't overridden here.
   const holdings = [...bySymbol.values()].map((h) => {
-    let basisSource: "simplefin" | "manual" | "stablecoin" | "cointracker-fifo" | null =
+    let basisSource: "simplefin" | "manual" | "stablecoin" | null =
       h.cost_basis != null ? "simplefin" : null;
 
     if (h.type === "crypto" && h.cost_basis == null) {
@@ -600,16 +480,6 @@ route.get("/holdings", (c) => {
       } else if (STABLECOINS.has(h.symbol)) {
         h.cost_basis = h.value_usd;
         basisSource = "stablecoin";
-      } else {
-        const fifo = fifoBasis.get(h.symbol);
-        if (fifo) {
-          const match = matchBasisToHolding(fifo, h.quantity);
-          if (match.basis != null && match.basis > 0) {
-            h.cost_basis = match.basis;
-            h.basis_coverage = match.coverage < 1 ? match.coverage : null;
-            basisSource = "cointracker-fifo";
-          }
-        }
       }
     }
     return {
@@ -620,50 +490,12 @@ route.get("/holdings", (c) => {
     };
   });
 
-  // Lifetime realized P&L per canonical symbol. The CoinTracker stream's
-  // "Sent Currency" is the disposed asset — canonicalizing it folds WETH
-  // disposals into the ETH holding's realized column, etc. Manual losses
-  // aren't tied to a specific symbol and are surfaced separately via
-  // totals.manual_adjustments so the per-row sum still reconciles.
-  const realizedByCanon = new Map<string, number>();
-  for (const e of cointrackerRealizedEvents(ctx)) {
-    const canon = canonicalSymbol(e.currency).toUpperCase();
-    realizedByCanon.set(canon, (realizedByCanon.get(canon) ?? 0) + e.realized_pnl);
-  }
-
   const liveHoldings: HoldingRow[] = holdings.map((h) => ({
     ...h,
-    realized_pnl: h.type === "crypto" ? realizedByCanon.get(h.symbol) ?? null : null,
+    realized_pnl: null,
     closed: false,
   }));
-  // A symbol with no live holding but non-zero lifetime realized is a
-  // closed position — surface it so the table gives the full
-  // past-and-present picture rather than hiding trades that already paid
-  // out.
-  const heldSymbols = new Set(liveHoldings.filter((h) => h.type === "crypto").map((h) => h.symbol));
-  const closedPositions: HoldingRow[] = [];
-  for (const [symbol, realized] of realizedByCanon) {
-    if (heldSymbols.has(symbol)) continue;
-    if (realized === 0) continue;
-    closedPositions.push({
-      symbol,
-      type: "crypto",
-      account_name: null,
-      value_usd: 0,
-      quantity: 0,
-      cost_basis: null,
-      basis_coverage: null,
-      basis_source: null,
-      unrealized_pnl: null,
-      realized_pnl: realized,
-      closed: true,
-    });
-  }
-  closedPositions.sort(
-    (a, b) => Math.abs(b.realized_pnl ?? 0) - Math.abs(a.realized_pnl ?? 0),
-  );
   liveHoldings.sort((a, b) => b.value_usd - a.value_usd);
-  const allHoldings = [...liveHoldings, ...closedPositions];
 
   const totalValue = liveHoldings.reduce((s, h) => s + h.value_usd, 0);
   const withBasis = liveHoldings.filter((h) => h.cost_basis != null);
@@ -676,16 +508,14 @@ route.get("/holdings", (c) => {
     (s, e) => s + e.realized_pnl,
     0,
   );
-  const totalRealized =
-    allHoldings.reduce((s, h) => s + (h.realized_pnl ?? 0), 0) + manualAdjustments;
 
   return c.json({
-    holdings: allHoldings,
+    holdings: liveHoldings,
     totals: {
       value: totalValue,
       cost_basis: totalBasis,
       unrealized_pnl: totalUnrealized,
-      realized_pnl: totalRealized,
+      realized_pnl: manualAdjustments,
       manual_adjustments: manualAdjustments,
     },
   });
@@ -804,9 +634,8 @@ route.get("/defi-breakdown", (c) => {
   });
 });
 
-// Manual basis entries for holdings that CoinTracker FIFO can't resolve
-// (symbols CoinTracker never saw, or positions where disposed ≥ acquired
-// so FIFO runs dry). Scoped per-symbol, optionally per-account.
+// Manual basis entries for crypto holdings without a SimpleFIN-supplied
+// basis. Scoped per-symbol, optionally per-account.
 
 route.get("/basis-overrides", (c) => {
   const ctx = c.get("ctx") as Ctx;

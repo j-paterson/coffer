@@ -109,7 +109,6 @@ route.get("/", (c) => {
       WHERE p.amount < 0
         AND p.account_id NOT LIKE 'equity:%'
         AND t.date >= date('now', '-90 days')
-        AND t.derived_by != 'cointracker'
         AND EXISTS (
           SELECT 1 FROM transaction_items i
           WHERE i.transaction_v2_id = t.id
@@ -162,7 +161,6 @@ route.get("/", (c) => {
       JOIN transactions_v2 t ON t.id = i.transaction_v2_id
       WHERE i.category IN (${placeholders})
         AND t.date >= date('now', '-90 days')
-        AND t.derived_by != 'cointracker'
         AND EXISTS (
           SELECT 1 FROM postings p
           WHERE p.txn_id = t.id

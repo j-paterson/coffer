@@ -1,109 +1,26 @@
 /** Realized P&L — the canonical stream of closed-position gains and losses.
  *
- * Two inputs merge into one sequence:
- *
- *   1. CoinTracker disposal events (SELL, TRADE, MULTI_TOKEN_TRADE, SEND,
- *      BRIDGE) with non-zero Realized Return (USD). Disposals where the
- *      Sent Currency is a stablecoin are filtered out — selling USDC for
- *      USDT at $0.998 isn't investment P&L, it's peg drift noise.
- *
- *   2. Manual write-downs booked as postings to `expense:realized-loss`.
- *      CoinTracker doesn't see perps platforms, off-exchange losses, or
- *      tokens rugged before being on-chain; the user books those directly
- *      against this expense account and we surface them as loss events.
+ * Sourced from manual write-downs booked as postings to
+ * `expense:realized-loss`. The user books off-exchange losses, perps
+ * platform losses, and rugged tokens directly against this expense
+ * account and we surface them here as loss events.
  *
  * Every consumer of realized-P&L numbers (the Investments header total,
  * the P&L chart, the trades table) reads through this module so they
- * can't drift out of sync. Historically the header queried CoinTracker
- * directly and missed the manual losses, producing a $149K gap versus
- * the chart. Fixed by routing all three through realizedPnlEvents().
+ * can't drift out of sync.
  */
 
 import type { Ctx } from "../ctx";
 import { bucketRange, dateSqlClause, periodKey, type DateRange } from "@coffer/ledger/walker";
 import type { Granularity } from "../../../../packages/shared/types";
 
-const DISPOSAL_TYPES = [
-  "SELL",
-  "TRADE",
-  "MULTI_TOKEN_TRADE",
-  "SEND",
-  "BRIDGE",
-] as const;
-
-const STABLECOIN_SENT_EXCLUDE = [
-  "USDC",
-  "USDT",
-  "DAI",
-  "BUSD",
-  "USD",
-] as const;
-
 export interface RealizedPnlEvent {
   date: string;
   currency: string;
   realized_pnl: number;
-  source: "cointracker" | "manual";
+  source: "manual";
   type: string;
   description: string;
-}
-
-function inlineSqlList(xs: readonly string[]): string {
-  return xs.map((s) => `'${s.replace(/'/g, "''")}'`).join(",");
-}
-
-/** SQL snippet for the CoinTracker Date field (MM/DD/YYYY in the raw
- * payload) normalized to ISO. Exported so endpoints that run their own
- * CoinTracker queries stay consistent. */
-export const COINTRACKER_DATE_EXPR = /* sql */ `
-  SUBSTR(
-    SUBSTR(json_extract(payload, '$.Date'), 7, 4) || '-' ||
-    SUBSTR(json_extract(payload, '$.Date'), 1, 2) || '-' ||
-    SUBSTR(json_extract(payload, '$.Date'), 4, 2), 1, 10
-  )
-`;
-
-/** WHERE-fragment + params for the standard realized-P&L disposal filter
- * (types + non-zero + stablecoin exclusion). Endpoints that want the same
- * per-event set as realizedPnlEvents but need richer columns can splice
- * this in to stay aligned with the canonical definition. */
-export const REALIZED_DISPOSAL_FILTER_SQL = /* sql */ `
-  source = 'cointracker'
-  AND json_extract(payload, '$.Type') IN (${inlineSqlList(DISPOSAL_TYPES)})
-  AND CAST(json_extract(payload, '$.Realized Return (USD)') AS REAL) != 0
-  AND json_extract(payload, '$.Sent Currency') NOT IN (${inlineSqlList(STABLECOIN_SENT_EXCLUDE)})
-`;
-
-export function cointrackerRealizedEvents(ctx: Ctx, opts?: DateRange): RealizedPnlEvent[] {
-  const { clause, params } = dateSqlClause(COINTRACKER_DATE_EXPR, opts);
-  const rows = ctx.db
-    .prepare(
-      /* sql */ `
-        SELECT
-          ${COINTRACKER_DATE_EXPR} AS date,
-          json_extract(payload, '$.Sent Currency') AS currency,
-          json_extract(payload, '$.Type') AS type,
-          CAST(json_extract(payload, '$.Realized Return (USD)') AS REAL) AS realized_pnl
-        FROM raw_events
-        WHERE ${REALIZED_DISPOSAL_FILTER_SQL}
-          ${clause}
-        ORDER BY date
-      `,
-    )
-    .all(...params) as Array<{
-      date: string;
-      currency: string;
-      type: string;
-      realized_pnl: number;
-    }>;
-  return rows.map((r) => ({
-    date: r.date,
-    currency: r.currency,
-    realized_pnl: r.realized_pnl,
-    source: "cointracker",
-    type: r.type,
-    description: "",
-  }));
 }
 
 export function manualRealizedLosses(ctx: Ctx, opts?: DateRange): RealizedPnlEvent[] {
@@ -134,15 +51,9 @@ export function manualRealizedLosses(ctx: Ctx, opts?: DateRange): RealizedPnlEve
   }));
 }
 
-/** Canonical realized-P&L event stream, date-ascending. Merge of the
- * CoinTracker disposal stream and manual write-downs. */
+/** Canonical realized-P&L event stream, date-ascending. */
 export function realizedPnlEvents(ctx: Ctx, opts?: DateRange): RealizedPnlEvent[] {
-  const merged = [
-    ...cointrackerRealizedEvents(ctx, opts),
-    ...manualRealizedLosses(ctx, opts),
-  ];
-  merged.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  return merged;
+  return manualRealizedLosses(ctx, opts);
 }
 
 export interface RealizedSeriesPoint {

@@ -57,7 +57,6 @@ export async function runPostSyncHooks(trigger: TriggerKind): Promise<HookResult
   if (CRYPTO_TRIGGERS.has(trigger)) {
     results.push(await runStep("backfill:defillama", ["backfill", "defillama"]));
     results.push(await runStep("backfill:crypto", ["backfill", "crypto"]));
-    results.push(await runStep("backfill:qty-walk", ["backfill", "qty-walk"]));
   }
 
   const failed = results.filter((r) => !r.ok);

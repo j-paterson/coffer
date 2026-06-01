@@ -1,7 +1,7 @@
 import { test, expect, beforeEach, afterEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { Hono } from "hono";
-import spendingRoute from "../spending_v2";
+import spendingRoute from "../spending";
 import type { Ctx } from "../../ctx";
 import { applyMigrations } from "../../db";
 import type { SpendingBreakdown, ItemsByCategory } from "../../../../../packages/shared/types";
@@ -32,7 +32,7 @@ function makeApp(d: Database) {
   const app = new Hono<{ Variables: { ctx: Ctx } }>();
   const ctx: Ctx = { db: d, today: "2026-04-30" };
   app.use("*", async (c, next) => { c.set("ctx", ctx); await next(); });
-  app.route("/api/v2/spending", spendingRoute);
+  app.route("/api/spending", spendingRoute);
   return app;
 }
 
@@ -68,7 +68,7 @@ test("by-category: basic aggregation by item category", async () => {
   seedSpend(db, { date: "2026-04-03", description: "Coffee Shop", category: "Food", amount: -10 });
 
   const app = makeApp(db);
-  const res = await app.request("/api/v2/spending/by-category?from=2026-04-01&to=2026-04-30");
+  const res = await app.request("/api/spending/by-category?from=2026-04-01&to=2026-04-30");
   expect(res.status).toBe(200);
 
   const body = (await res.json()) as SpendingBreakdown;
@@ -92,41 +92,13 @@ test("by-category: items with category='Transfer' are excluded", async () => {
   seedSpend(db, { date: "2026-04-08", description: "Coffee", category: "Food", amount: -5 });
 
   const app = makeApp(db);
-  const res = await app.request("/api/v2/spending/by-category?from=2026-04-01&to=2026-04-30");
+  const res = await app.request("/api/spending/by-category?from=2026-04-01&to=2026-04-30");
   expect(res.status).toBe(200);
 
   const body = (await res.json()) as SpendingBreakdown;
   // Transfer category should not appear
   expect(body.rows.find(r => r.category === "Transfer")).toBeUndefined();
   // Food should still be present
-  expect(body.rows.find(r => r.category === "Food")).toBeDefined();
-});
-
-test("by-category: cointracker-derived txns are excluded", async () => {
-  // Insert cointracker txn directly (not via seedSpend which uses 'ingest')
-  db.prepare(
-    `INSERT INTO transactions_v2 (date, description, derived_by)
-     VALUES ('2026-04-09', 'BTC Buy', 'cointracker')`,
-  ).run();
-  const coinId = (db.prepare(`SELECT last_insert_rowid() AS id`).get() as { id: number }).id;
-  db.prepare(`INSERT INTO postings (txn_id, account_id, amount) VALUES (?, 'acct:test', ?)`).run(coinId, -1000);
-  db.prepare(`INSERT INTO postings (txn_id, account_id, amount) VALUES (?, 'equity:unknown-counterparty', ?)`).run(coinId, 1000);
-  db.prepare(
-    `INSERT INTO transaction_items (line_no, name, line_total, category, transaction_v2_id)
-     VALUES (1, 'BTC Buy', -1000, 'Crypto', ?)`,
-  ).run(coinId);
-
-  // Add a normal txn so the response isn't empty
-  seedSpend(db, { date: "2026-04-09", description: "Lunch", category: "Food", amount: -15 });
-
-  const app = makeApp(db);
-  const res = await app.request("/api/v2/spending/by-category?from=2026-04-01&to=2026-04-30");
-  expect(res.status).toBe(200);
-
-  const body = (await res.json()) as SpendingBreakdown;
-  // Crypto from cointracker should not appear
-  expect(body.rows.find(r => r.category === "Crypto")).toBeUndefined();
-  // Food from normal txn should appear
   expect(body.rows.find(r => r.category === "Food")).toBeDefined();
 });
 
@@ -154,7 +126,7 @@ test("by-category: multi-posting txns (real transfers) are excluded", async () =
   seedSpend(db, { date: "2026-04-10", description: "Gas Station", category: "Auto", amount: -60 });
 
   const app = makeApp(db);
-  const res = await app.request("/api/v2/spending/by-category?from=2026-04-01&to=2026-04-30");
+  const res = await app.request("/api/spending/by-category?from=2026-04-01&to=2026-04-30");
   expect(res.status).toBe(200);
 
   const body = (await res.json()) as SpendingBreakdown;
@@ -170,7 +142,7 @@ test("by-category: date range filtering excludes out-of-range txns", async () =>
 
   const app = makeApp(db);
   // Only request April
-  const res = await app.request("/api/v2/spending/by-category?from=2026-04-01&to=2026-04-30");
+  const res = await app.request("/api/spending/by-category?from=2026-04-01&to=2026-04-30");
   expect(res.status).toBe(200);
 
   const body = (await res.json()) as SpendingBreakdown;
@@ -186,7 +158,7 @@ test("by-category: top_merchants populated per category", async () => {
   seedSpend(db, { date: "2026-04-03", description: "Home Depot", category: "Hardware", amount: -200 });
 
   const app = makeApp(db);
-  const res = await app.request("/api/v2/spending/by-category?from=2026-04-01&to=2026-04-30");
+  const res = await app.request("/api/spending/by-category?from=2026-04-01&to=2026-04-30");
   expect(res.status).toBe(200);
 
   const body = (await res.json()) as SpendingBreakdown;
@@ -226,7 +198,7 @@ test("items-by-category: returns subcategory buckets for a parent category", asy
   ).run(txnId);
 
   const app = makeApp(db);
-  const res = await app.request("/api/v2/spending/items-by-category?parent=Food");
+  const res = await app.request("/api/spending/items-by-category?parent=Food");
   expect(res.status).toBe(200);
 
   const body = (await res.json()) as ItemsByCategory;
@@ -243,38 +215,13 @@ test("items-by-category: returns subcategory buckets for a parent category", asy
   expect(bakery?.total).toBe(-5);
 });
 
-// ─── new: multi-item txn splits across categories ────────────────────────────
-
-test("by-category: multi-item txn splits across categories", async () => {
-  const id = seedSpend(db, { date: "2026-04-10", description: "Mixed", category: "Food", amount: -30 });
-  // Replace the single synthesized item with two items in different categories
-  db.prepare(`DELETE FROM transaction_items WHERE transaction_v2_id = ?`).run(id);
-  db.prepare(
-    `INSERT INTO transaction_items (line_no, name, line_total, category, transaction_v2_id)
-     VALUES (1, 'a', -10, 'Food', ?)`,
-  ).run(id);
-  db.prepare(
-    `INSERT INTO transaction_items (line_no, name, line_total, category, transaction_v2_id)
-     VALUES (2, 'b', -20, 'Hardware', ?)`,
-  ).run(id);
-
-  const app = makeApp(db);
-  const res = await app.request("/api/v2/spending/by-category?from=2026-04-01&to=2026-04-30");
-  expect(res.status).toBe(200);
-
-  const body = (await res.json()) as SpendingBreakdown;
-  // Each category slice gets only its item's total
-  expect(body.rows.find(r => r.category === "Food")?.total).toBe(-10);
-  expect(body.rows.find(r => r.category === "Hardware")?.total).toBe(-20);
-});
-
 // ─── ignore-in-spending tests ────────────────────────────────────────────────
 
 test("by-category: excluded rows are dropped from the breakdown", async () => {
   seedSpend(db, { date: "2026-04-10", description: "Cafe", category: "Food", amount: -10 });
   seedSpend(db, { date: "2026-04-11", description: "Refund test", category: "Food", amount: -25, excluded: true });
   const app = makeApp(db);
-  const res = await app.request("/api/v2/spending/by-category?from=2026-04-01&to=2026-04-30");
+  const res = await app.request("/api/spending/by-category?from=2026-04-01&to=2026-04-30");
   const body = (await res.json()) as SpendingBreakdown;
   const food = body.rows.find((r) => r.category === "Food")!;
   expect(food.count).toBe(1);
@@ -285,7 +232,7 @@ test("transactions: excluded rows are omitted by default", async () => {
   seedSpend(db, { date: "2026-04-10", description: "Cafe", category: "Food", amount: -10 });
   seedSpend(db, { date: "2026-04-11", description: "Skip me", category: "Food", amount: -25, excluded: true });
   const app = makeApp(db);
-  const res = await app.request("/api/v2/spending/transactions?category=Food&from=2026-04-01&to=2026-04-30");
+  const res = await app.request("/api/spending/transactions?category=Food&from=2026-04-01&to=2026-04-30");
   const body = (await res.json()) as { rows: { description: string }[]; excluded_count: number };
   expect(body.rows.length).toBe(1);
   expect(body.rows[0].description).toBe("Cafe");
@@ -296,7 +243,7 @@ test("transactions: include_excluded=1 returns ignored rows with the flag set", 
   seedSpend(db, { date: "2026-04-10", description: "Cafe", category: "Food", amount: -10 });
   seedSpend(db, { date: "2026-04-11", description: "Skip me", category: "Food", amount: -25, excluded: true });
   const app = makeApp(db);
-  const res = await app.request("/api/v2/spending/transactions?category=Food&from=2026-04-01&to=2026-04-30&include_excluded=1");
+  const res = await app.request("/api/spending/transactions?category=Food&from=2026-04-01&to=2026-04-30&include_excluded=1");
   const body = (await res.json()) as {
     rows: { description: string; excluded_from_spending: boolean }[];
     excluded_count: number;
@@ -313,7 +260,7 @@ test("items-by-category: excluded rows' items are dropped", async () => {
   seedSpend(db, { date: "2026-04-10", description: "Cafe", category: "Food", amount: -10 });
   seedSpend(db, { date: "2026-04-11", description: "Skip", category: "Food", amount: -25, excluded: true });
   const app = makeApp(db);
-  const res = await app.request("/api/v2/spending/items-by-category?parent=Food&from=2026-04-01&to=2026-04-30");
+  const res = await app.request("/api/spending/items-by-category?parent=Food&from=2026-04-01&to=2026-04-30");
   const body = (await res.json()) as ItemsByCategory;
   expect(body.total_items).toBe(1);
 });
@@ -321,7 +268,7 @@ test("items-by-category: excluded rows' items are dropped", async () => {
 test("PATCH /transactions/:id/exclude flips the column", async () => {
   const id = seedSpend(db, { date: "2026-04-10", description: "Cafe", category: "Food", amount: -10 });
   const app = makeApp(db);
-  const res = await app.request(`/api/v2/spending/transactions/${id}/exclude`, {
+  const res = await app.request(`/api/spending/transactions/${id}/exclude`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ excluded: true }),
@@ -338,7 +285,7 @@ test("PATCH /transactions/:id/exclude flips the column", async () => {
 test("PATCH is idempotent (no-op flip is still 200 ok)", async () => {
   const id = seedSpend(db, { date: "2026-04-10", description: "Cafe", category: "Food", amount: -10, excluded: true });
   const app = makeApp(db);
-  const res = await app.request(`/api/v2/spending/transactions/${id}/exclude`, {
+  const res = await app.request(`/api/spending/transactions/${id}/exclude`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ excluded: true }),
@@ -350,7 +297,7 @@ test("PATCH is idempotent (no-op flip is still 200 ok)", async () => {
 
 test("PATCH on missing id returns 404", async () => {
   const app = makeApp(db);
-  const res = await app.request(`/api/v2/spending/transactions/9999999/exclude`, {
+  const res = await app.request(`/api/spending/transactions/9999999/exclude`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ excluded: true }),
@@ -379,7 +326,7 @@ test("by-category: items with NULL line_total fall back to unit_price * quantity
   ).run(txnId);
 
   const app = makeApp(db);
-  const res = await app.request("/api/v2/spending/by-category?from=2026-04-01&to=2026-04-30");
+  const res = await app.request("/api/spending/by-category?from=2026-04-01&to=2026-04-30");
   expect(res.status).toBe(200);
   const body = (await res.json()) as SpendingBreakdown;
   const hardware = body.rows.find((r) => r.category === "Hardware");
@@ -405,7 +352,7 @@ test("items-by-category: subcategory bucket with NULL line_total falls back to u
   ).run(txnId);
 
   const app = makeApp(db);
-  const res = await app.request("/api/v2/spending/items-by-category?parent=Hardware&from=2026-04-01&to=2026-04-30");
+  const res = await app.request("/api/spending/items-by-category?parent=Hardware&from=2026-04-01&to=2026-04-30");
   expect(res.status).toBe(200);
   const body = (await res.json()) as ItemsByCategory;
   const tools = body.subcategories.find((s) => s.category === "Power Tools");
@@ -417,7 +364,7 @@ test("items-by-category: subcategory bucket with NULL line_total falls back to u
 test("PATCH with non-JSON body returns 400 with structured error", async () => {
   const id = seedSpend(db, { date: "2026-04-10", description: "Cafe", category: "Food", amount: -10 });
   const app = makeApp(db);
-  const res = await app.request(`/api/v2/spending/transactions/${id}/exclude`, {
+  const res = await app.request(`/api/spending/transactions/${id}/exclude`, {
     method: "PATCH",
     headers: { "content-type": "text/plain" },
     body: "not-json",
