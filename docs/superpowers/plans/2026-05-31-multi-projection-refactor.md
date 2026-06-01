@@ -627,7 +627,7 @@ The 13 files importing from `packages/shared` (everything except `CompareCard.ts
 Run, from repo root:
 
 ```bash
-cd /home/jesse_paterson/projects/finance-public
+cd <repo-root>
 sed -i 's|"../../../../../packages/shared/types"|"../../../../../../packages/shared/types"|g' \
   apps/web/src/routes/projections/heloc/*.tsx \
   apps/web/src/routes/projections/heloc/useScenario.ts
@@ -638,7 +638,7 @@ sed -i 's|"../../../../../packages/shared/types"|"../../../../../../packages/sha
 `NetWorthChart.tsx`, `DeltaChart.tsx`, and `AdvisorPanel.tsx` import from `"../../lib/..."`. After the move that becomes `"../../../lib/..."`. Run:
 
 ```bash
-cd /home/jesse_paterson/projects/finance-public
+cd <repo-root>
 sed -i 's|from "../../lib/|from "../../../lib/|g' \
   apps/web/src/routes/projections/heloc/NetWorthChart.tsx \
   apps/web/src/routes/projections/heloc/DeltaChart.tsx \
