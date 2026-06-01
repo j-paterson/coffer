@@ -40,14 +40,14 @@ describe("recordEvent", () => {
 
   test("records source_file when provided", () => {
     const id = recordEvent(db, {
-      source: "chase-statement",
+      source: "csv-import",
       external_id: "stmt-2024-12",
       payload: {},
-      source_file: "raw/chase/20241201-statements-1234.pdf",
+      source_file: "raw/statements/20241201.csv",
     });
     const row = db.query("SELECT source_file FROM raw_events WHERE id = ?").get(id) as {
       source_file: string;
     };
-    expect(row.source_file).toBe("raw/chase/20241201-statements-1234.pdf");
+    expect(row.source_file).toBe("raw/statements/20241201.csv");
   });
 });

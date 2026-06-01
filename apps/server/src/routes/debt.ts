@@ -5,7 +5,7 @@ import type { DebtAccount, DebtStrategy } from "../../../../packages/shared/type
 const route = new Hono();
 
 function loadDebt(ctx: Ctx): DebtAccount[] {
-  // Balance comes from the latest balance_assertion (SimpleFIN / Kubera
+  // Balance comes from the latest balance_assertion (SimpleFIN / manual
   // ground truth), not cumulative postings. The ledger drifts between
   // statement-date pads and fresh assertions, producing under-reported
   // card balances. Assertions are the canonical "what the issuer says."

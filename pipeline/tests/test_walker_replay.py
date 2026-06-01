@@ -50,7 +50,7 @@ def _seed_alchemy_cache(
 def test_alchemy_replay_writes_snapshots_from_cached_transfers(
     monkeypatch, conn, seed_account
 ):
-    """A wallet with two cached transfers gets the same qty-walk +
+    """A wallet with two cached transfers gets the same pricing +
     snapshot output it would get from a live fetch."""
     addr = "0x000000000000000000000000000000000000beef"
     contract = "0x0000000000000000000000000000000000000aaa"

@@ -100,7 +100,7 @@ apps/
   server/      Bun + Hono API
   web/         React + Vite + Tailwind dashboard
 
-pipeline/      Legacy Python sidecar (Chase PDF parser, Kubera CSV)
+pipeline/      Python sidecar (reconcile, categorize, backfill prices) invoked from postSyncHooks
 scripts/       Backfill and diagnostic tools
 e2e/           Playwright end-to-end tests
 db/migrations  SQL migration files (forward-only)

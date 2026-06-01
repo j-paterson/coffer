@@ -5,7 +5,7 @@ import type { Summary } from "../../../../packages/shared/types";
 
 const route = new Hono();
 
-// Headline summary — exact same walker as /api/v2/networth/series uses,
+// Headline summary — exact same walker as /api/networth/series uses,
 // evaluated at today. Single path guarantees summary agrees with the
 // chart's right-edge value.
 route.get("/", (c) => {
@@ -13,9 +13,9 @@ route.get("/", (c) => {
   const ctx = c.get("ctx") as Ctx;
 
   // Canonical accounts: active, not merged, not equity ledger.
-  // Inactive canonicals (e.g. legacy CoinTracker bundle) carry stale
-  // historical postings with no current anchor; including them inflates
-  // net worth with long-ago activity that was never closed out.
+  // Inactive canonicals carry stale historical postings with no current
+  // anchor; including them inflates net worth with long-ago activity
+  // that was never closed out.
   const canonicals = (ctx.db
     .prepare(
       `SELECT id, type FROM accounts

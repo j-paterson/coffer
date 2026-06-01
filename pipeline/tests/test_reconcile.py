@@ -1,9 +1,9 @@
-"""Reconcile v1 (manual) → v2 (live) account merge semantics.
+"""Reconcile manual → live account merge semantics.
 
 apply_matches must delete every child row that references a manual
 account before the account row itself can go — SQLite's FK enforcement
 blocks the account DELETE otherwise. The sync pipeline calls this on
-every SimpleFIN run; a missed child table silently breaks sync.
+every live-feed run; a missed child table silently breaks sync.
 """
 from __future__ import annotations
 
@@ -13,12 +13,12 @@ from finance_pipeline.reconcile import ReconcileMatch
 
 def _match(manual_id: str, live_id: str) -> ReconcileMatch:
     return ReconcileMatch(
-        kubera_id=manual_id,
-        kubera_name="Manual",
-        kubera_type="checking",
-        simplefin_id=live_id,
-        simplefin_name="Live",
-        simplefin_type="checking",
+        manual_id=manual_id,
+        manual_name="Manual",
+        manual_type="checking",
+        live_id=live_id,
+        live_name="Live",
+        live_type="checking",
         matched_on="test",
     )
 
@@ -49,7 +49,7 @@ def test_apply_matches_clears_every_child_table(conn, seed_account):
     seed_account("manual:b", mode="manual", type="credit")
     conn.execute(
         "INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) "
-        "VALUES ('manual:b', '2025-01-01', 100.0, 'kubera')"
+        "VALUES ('manual:b', '2025-01-01', 100.0, 'manual')"
     )
     conn.execute(
         "INSERT INTO transactions_v2 (id, date, description, derived_by) "
@@ -92,14 +92,14 @@ def test_apply_matches_nulls_merged_into_self_ref(conn, seed_account):
 
 
 def test_apply_matches_inherits_manual_type_on_cross_group_mismatch(conn, seed_account):
-    """When Kubera says 'checking' and SimpleFIN says 'brokerage', trust
-    Kubera — see _choose_type docstring."""
+    """When the manual entry says 'checking' and the live feed says
+    'brokerage', trust the manual — see _choose_type docstring."""
     seed_account("live:sfc", mode="live", type="brokerage")
     seed_account("manual:sfc", mode="manual", type="checking")
 
     match = ReconcileMatch(
-        kubera_id="manual:sfc", kubera_name="m", kubera_type="checking",
-        simplefin_id="live:sfc", simplefin_name="s", simplefin_type="brokerage",
+        manual_id="manual:sfc", manual_name="m", manual_type="checking",
+        live_id="live:sfc", live_name="s", live_type="brokerage",
         matched_on="test",
     )
     reconcile.apply_matches(conn, [match])
@@ -115,10 +115,10 @@ def test_apply_matches_empty_is_noop(conn):
 # ---------------------------------------------------------------- dedup
 #
 # Cross-source dedup collapses v2 txns that represent the same real-world
-# event observed through different providers (Chase CSV + SimpleFIN,
-# CoinTracker CSV + Zerion, etc.). The invariant: only merge when the
-# supporting ``raw_events.source`` values genuinely differ. Legitimate
-# repeat charges from the same provider (two Zelles the same day) must
+# event observed through different providers (e.g. a CSV import +
+# SimpleFIN). The invariant: only merge when the supporting
+# ``raw_events.source`` values genuinely differ. Legitimate repeat
+# charges from the same provider (two transfers the same day) must
 # survive.
 
 import json
@@ -172,7 +172,7 @@ def _seed_txn_with_source(
 
 def test_dedup_collapses_cross_source_pair(conn, seed_account):
     seed_account("live:a", mode="live")
-    canon = _seed_txn_with_source(conn, "2026-04-10", 80.06, "chase-statement", "c-1")
+    canon = _seed_txn_with_source(conn, "2026-04-10", 80.06, "csv-import", "c-1")
     loser = _seed_txn_with_source(conn, "2026-04-11", 80.06, "simplefin", "s-1")
 
     stats = dedup_transactions(conn, window_days=3)
@@ -194,7 +194,7 @@ def test_dedup_collapses_cross_source_pair(conn, seed_account):
             (canon,),
         ).fetchall()
     }
-    assert sources == {"chase-statement", "simplefin"}
+    assert sources == {"csv-import", "simplefin"}
     # audit row records the merge.
     note = conn.execute(
         "SELECT detail FROM reconciliation_notes WHERE kind = 'dedup'"
@@ -234,7 +234,7 @@ def test_dedup_refuses_when_audit_missing(conn, seed_account):
     """If either side has no event_links, we can't vouch for its provider
     identity — refuse to merge (fail-safe)."""
     seed_account("live:a", mode="live")
-    _seed_txn_with_source(conn, "2026-04-10", 20.00, "chase-statement", "c-x")
+    _seed_txn_with_source(conn, "2026-04-10", 20.00, "csv-import", "c-x")
     # Second txn has no raw_events/event_links at all.
     cur = conn.execute(
         "INSERT INTO transactions_v2 (date, description, derived_by) "
@@ -259,7 +259,7 @@ def test_dedup_refuses_when_audit_missing(conn, seed_account):
 
 def test_dedup_repoints_items_and_emails(conn, seed_account):
     seed_account("live:a", mode="live")
-    canon = _seed_txn_with_source(conn, "2026-04-10", 42.00, "chase-statement", "c-1")
+    canon = _seed_txn_with_source(conn, "2026-04-10", 42.00, "csv-import", "c-1")
     loser = _seed_txn_with_source(conn, "2026-04-11", 42.00, "simplefin", "s-1")
     conn.execute(
         """
@@ -291,7 +291,7 @@ def test_dedup_repoints_items_and_emails(conn, seed_account):
 
 def test_dedup_unions_tags_and_picks_smallest_id_canonical(conn, seed_account):
     seed_account("live:a", mode="live")
-    a = _seed_txn_with_source(conn, "2026-04-10", 10.00, "chase-statement", "c-1")
+    a = _seed_txn_with_source(conn, "2026-04-10", 10.00, "csv-import", "c-1")
     b = _seed_txn_with_source(conn, "2026-04-11", 10.00, "simplefin", "s-1")
     conn.execute("UPDATE transactions_v2 SET tags = 'receipt-only' WHERE id = ?", (a,))
     conn.execute(
@@ -315,7 +315,7 @@ def test_dedup_unions_tags_and_picks_smallest_id_canonical(conn, seed_account):
 
 def test_dedup_dry_run_writes_nothing(conn, seed_account):
     seed_account("live:a", mode="live")
-    _seed_txn_with_source(conn, "2026-04-10", 99.00, "chase-statement", "c-1")
+    _seed_txn_with_source(conn, "2026-04-10", 99.00, "csv-import", "c-1")
     _seed_txn_with_source(conn, "2026-04-11", 99.00, "simplefin", "s-1")
 
     stats = dedup_transactions(conn, window_days=3, dry_run=True)
@@ -331,7 +331,7 @@ def test_dedup_dry_run_writes_nothing(conn, seed_account):
 def test_dedup_respects_window(conn, seed_account):
     """Matches outside the ±window_days band don't cluster."""
     seed_account("live:a", mode="live")
-    _seed_txn_with_source(conn, "2026-04-01", 77.00, "chase-statement", "c-1")
+    _seed_txn_with_source(conn, "2026-04-01", 77.00, "csv-import", "c-1")
     _seed_txn_with_source(conn, "2026-04-15", 77.00, "simplefin", "s-1")
 
     stats = dedup_transactions(conn, window_days=3)

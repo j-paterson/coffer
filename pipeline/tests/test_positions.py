@@ -76,7 +76,7 @@ def test_record_snapshot_distinct_sources_coexist(conn, seed_account):
     )
     positions.record_snapshot(
         conn, position_id=pid, as_of="2025-01-01",
-        source="kubera", value_usd=1100.0,
+        source="alchemy", value_usd=1100.0,
     )
     rows = conn.execute(
         "SELECT source, value_usd FROM position_snapshots "
@@ -84,7 +84,7 @@ def test_record_snapshot_distinct_sources_coexist(conn, seed_account):
         (pid,),
     ).fetchall()
     assert [(r[0], r[1]) for r in rows] == [
-        ("kubera", 1100.0),
+        ("alchemy", 1100.0),
         ("zerion", 1000.0),
     ]
 

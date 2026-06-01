@@ -29,7 +29,7 @@ def test_clear_zero_value_manual_keeps_accounts_with_assertion(monkeypatch, conn
     seed_account("manual:house", mode="manual", type="alt")
     conn.execute(
         "INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) "
-        "VALUES ('manual:house', '2025-01-01', 500000.0, 'kubera')"
+        "VALUES ('manual:house', '2025-01-01', 500000.0, 'manual')"
     )
     _patch_connect(monkeypatch, conn)
 
@@ -57,7 +57,7 @@ def test_clear_zero_value_manual_archives_zero_assertion(monkeypatch, conn, seed
     seed_account("manual:zero", mode="manual")
     conn.execute(
         "INSERT INTO balance_assertions (account_id, as_of, expected_usd, source) "
-        "VALUES ('manual:zero', '2025-01-01', 0.0, 'kubera')"
+        "VALUES ('manual:zero', '2025-01-01', 0.0, 'manual')"
     )
     _patch_connect(monkeypatch, conn)
 
@@ -111,8 +111,6 @@ def test_sync_emits_per_chain_events(monkeypatch, conn):
     # Quiet the post-loop machinery — none of it is in scope for this test.
     monkeypatch.setattr(zerion, "_fetch_chart", lambda addr, period, chain: {"data": {"attributes": {"points": []}}})
     monkeypatch.setattr(zerion, "_cache_hit", lambda source, subject, hours: True)
-    monkeypatch.setattr(zerion, "apply_kubera_nicknames", lambda synced: 0)
-    monkeypatch.setattr(zerion, "reconcile_kubera", lambda synced: 0)
     monkeypatch.setattr(zerion, "reconcile_evm_by_name", lambda: 0)
     monkeypatch.setattr(zerion, "clear_zero_value_manual", lambda: 0)
     monkeypatch.setattr("finance_pipeline.parsers.zerion.time.sleep", lambda *a, **k: None)
@@ -219,8 +217,6 @@ def test_sync_emits_account_finished_false_on_per_chain_error(monkeypatch, conn)
 
     monkeypatch.setattr(zerion, "_fetch_chart", lambda addr, period, chain: {"data": {"attributes": {"points": []}}})
     monkeypatch.setattr(zerion, "_cache_hit", lambda source, subject, hours: True)
-    monkeypatch.setattr(zerion, "apply_kubera_nicknames", lambda synced: 0)
-    monkeypatch.setattr(zerion, "reconcile_kubera", lambda synced: 0)
     monkeypatch.setattr(zerion, "reconcile_evm_by_name", lambda: 0)
     monkeypatch.setattr(zerion, "clear_zero_value_manual", lambda: 0)
     monkeypatch.setattr("finance_pipeline.parsers.zerion.time.sleep", lambda *a, **k: None)

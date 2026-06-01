@@ -114,11 +114,11 @@ def test_assert_balance_idempotent_upsert(conn, seed_account):
     seed_account("a")
     ledger.assert_balance(
         conn, account_id="a", as_of="2025-01-01",
-        expected_usd=1000.0, source="kubera",
+        expected_usd=1000.0, source="manual",
     )
     ledger.assert_balance(
         conn, account_id="a", as_of="2025-01-01",
-        expected_usd=1500.0, source="kubera",
+        expected_usd=1500.0, source="manual",
     )
     rows = conn.execute(
         "SELECT expected_usd FROM balance_assertions WHERE account_id='a'"
@@ -132,7 +132,7 @@ def test_assert_balance_distinct_sources_coexist(conn, seed_account):
     seed_account("a")
     ledger.assert_balance(
         conn, account_id="a", as_of="2025-01-01",
-        expected_usd=1000.0, source="kubera",
+        expected_usd=1000.0, source="manual",
     )
     ledger.assert_balance(
         conn, account_id="a", as_of="2025-01-01",
@@ -141,4 +141,4 @@ def test_assert_balance_distinct_sources_coexist(conn, seed_account):
     rows = conn.execute(
         "SELECT source, expected_usd FROM balance_assertions WHERE account_id='a' ORDER BY source"
     ).fetchall()
-    assert [(r[0], r[1]) for r in rows] == [("kubera", 1000.0), ("simplefin", 1100.0)]
+    assert [(r[0], r[1]) for r in rows] == [("manual", 1000.0), ("simplefin", 1100.0)]

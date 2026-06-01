@@ -46,18 +46,16 @@ Row counts, date range, accounts & symbols covered for one data source.
 Also shows the `data_sources` registry row (kind, rank, enabled).
 
 ```bash
-bun run scripts/diagnose/diagnose.ts source coinbase-direct
-bun run scripts/diagnose/diagnose.ts source backfill:txn-walk
+bun run scripts/diagnose/diagnose.ts source simplefin
+bun run scripts/diagnose/diagnose.ts source zerion
 ```
 
 ### `gaps [--min-txns N] [--min-value USD]`
 
 Coverage audit:
-1. Symbols in `cointracker` raw_events with no `asset_prices` coverage
-   (these vanish if CoinTracker is fully retired).
-2. Positions with zero snapshots.
-3. `position_snapshots` sources not registered in `data_sources`.
-4. `balance_assertions` sources not registered in `data_sources`.
+1. Positions with zero snapshots.
+2. `position_snapshots` sources not registered in `data_sources`.
+3. `balance_assertions` sources not registered in `data_sources`.
 
 ```bash
 bun run scripts/diagnose/diagnose.ts gaps --min-value 1000

@@ -51,10 +51,9 @@ API keys live in `.env`. See `.env.example` for the full list.
 ## Categorization & sidecar (optional)
 
 Coffer ships with a Python sidecar in `pipeline/` that handles rule-based
-categorization, transfer reconciliation, price backfills, and a few
-file-based ingest paths (Chase PDF statements, Kubera CSV exports).
-Without it the dashboard still works, but every transaction stays in
-"Uncategorized" and the server's post-sync hooks log skipped steps.
+categorization, transfer reconciliation, and price backfills. Without it
+the dashboard still works, but every transaction stays in "Uncategorized"
+and the server's post-sync hooks log skipped steps.
 
 ```bash
 # From the repo root
@@ -81,8 +80,6 @@ Useful sidecar commands:
 | `finance reconcile dedup` | Merge duplicate transactions across sources |
 | `finance reconcile transfers` | Link transfer counterparties between accounts |
 | `finance backfill prices` | Fill missing daily prices for assets you hold |
-| `finance ingest chase-statements --path <pdf>` | Parse a Chase monthly PDF |
-| `finance ingest kubera --path <csv>` | Import a Kubera asset CSV |
 | `finance --help` | Full subcommand list |
 
 ## Architecture
