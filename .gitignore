@@ -47,6 +47,7 @@ logs/
 
 # Superpowers brainstorming sessions
 .superpowers/
+docs/superpowers/
 
 # Git worktrees (isolated workspaces for feature branches)
 .worktrees/
