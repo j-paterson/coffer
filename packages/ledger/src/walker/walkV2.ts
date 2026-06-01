@@ -236,8 +236,7 @@ export function walkSeveralCanonicals(
       if (sorted.length > 0) {
       let cursor: string = sorted[0]!;
       let running = 0;
-      const assetOnlyTypes = DEFAULT_ASSET_ONLY_TYPES;
-      const isAssetOnly = assetOnlyTypes.has(typeByCanonical.get(canonical) ?? "");
+      const isAssetOnly = DEFAULT_ASSET_ONLY_TYPES.has(typeByCanonical.get(canonical) ?? "");
       while (cursor <= globalEnd) {
         if (anchors?.has(cursor)) running = anchors.get(cursor)!;
         else if (deltas?.has(cursor)) running += deltas.get(cursor) ?? 0;
