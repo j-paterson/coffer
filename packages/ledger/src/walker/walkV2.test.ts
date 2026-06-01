@@ -1,5 +1,4 @@
-/** Tests for walkSeveralCanonicals — specifically the networthFloor behaviour
- *  controlled via ctx.walkerConfig.networthFloor.
+/** Tests for walkSeveralCanonicals.
  *
  *  We use an in-memory SQLite database seeded with the minimal schema the
  *  walker touches, avoiding the full migration stack so the tests run fast
@@ -148,16 +147,16 @@ function makeCtx(db: Database, overrides?: Partial<LedgerCtx>): LedgerCtx {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("walkSeveralCanonicals — networthFloor", () => {
+describe("walkSeveralCanonicals — date range", () => {
   let db: Database;
 
   beforeEach(() => {
     db = makeDb();
   });
 
-  test("without walkerConfig, all dates from first signal are included", () => {
+  test("all dates from first signal are included", () => {
     const id = seedCheckingAccount(db);
-    const ctx = makeCtx(db); // no walkerConfig → no floor
+    const ctx = makeCtx(db);
 
     const result = walkSeveralCanonicals(ctx, [id]);
     const series = result.get(id)!;
@@ -167,75 +166,6 @@ describe("walkSeveralCanonicals — networthFloor", () => {
     expect(series.has("2019-06-01")).toBe(true);
     // and continue through today
     expect(series.has("2021-03-15")).toBe(true);
-  });
-
-  test("with walkerConfig.networthFloor, dates before floor are excluded", () => {
-    const id = seedCheckingAccount(db);
-    const ctx = makeCtx(db, {
-      walkerConfig: { networthFloor: "2020-07-01" },
-    });
-
-    const result = walkSeveralCanonicals(ctx, [id]);
-    const series = result.get(id)!;
-
-    expect(series).toBeDefined();
-    // Dates before the floor must be absent
-    expect(series.has("2019-06-01")).toBe(false);
-    // Dates on or after the floor must be present
-    expect(series.has("2020-07-01")).toBe(true);
-    expect(series.has("2021-03-15")).toBe(true);
-  });
-
-  test("with networthFloor equal to the only signal date, that date is included", () => {
-    const id = "acct:single";
-    db.exec(`
-      INSERT INTO accounts (id, display_name, type, active)
-      VALUES ('${id}', 'Single Date', 'checking', 1);
-      INSERT INTO accounts (id, display_name, type, active) VALUES ('equity:opening-balance', 'OB', 'alt', 1)
-      ON CONFLICT DO NOTHING;
-    `);
-    db.exec(`INSERT INTO transactions_v2 (date, derived_by) VALUES ('2021-01-10', 'ingest');`);
-    const txnId = (db.query("SELECT last_insert_rowid() AS id").get() as { id: number }).id;
-    db.exec(`
-      INSERT INTO postings (txn_id, account_id, amount) VALUES (${txnId}, '${id}', 999);
-      INSERT INTO postings (txn_id, account_id, amount) VALUES (${txnId}, 'equity:opening-balance', -999);
-    `);
-
-    const ctx = makeCtx(db, { walkerConfig: { networthFloor: "2021-01-10" } });
-    const result = walkSeveralCanonicals(ctx, [id]);
-    const series = result.get(id)!;
-
-    expect(series.has("2021-01-10")).toBe(true);
-    // Nothing before it
-    expect(series.has("2021-01-09")).toBe(false);
-  });
-
-  test("with networthFloor after the last signal, series is empty", () => {
-    const id = seedCheckingAccount(db);
-    // Floor is after all signals (last posting is 2021-03-15) AND after today (2021-04-01)
-    const ctx = makeCtx(db, {
-      today: "2021-06-01",
-      walkerConfig: { networthFloor: "2021-06-02" },
-    });
-
-    const result = walkSeveralCanonicals(ctx, [id]);
-    const series = result.get(id)!;
-
-    // Walk today=2021-06-01 and floor=2021-06-02 → nothing emitted
-    expect(series.size).toBe(0);
-  });
-
-  test("walkerConfig with networthFloor=undefined behaves identically to no walkerConfig", () => {
-    const id = seedCheckingAccount(db);
-    const ctxWithUndefined = makeCtx(db, { walkerConfig: { networthFloor: undefined } });
-    const ctxWithoutConfig = makeCtx(db);
-
-    const r1 = walkSeveralCanonicals(ctxWithUndefined, [id]).get(id)!;
-    const r2 = walkSeveralCanonicals(ctxWithoutConfig, [id]).get(id)!;
-
-    expect(r1.size).toBe(r2.size);
-    expect(r1.has("2019-06-01")).toBe(true);
-    expect(r2.has("2019-06-01")).toBe(true);
   });
 });
 
@@ -279,12 +209,12 @@ describe("walkSeveralCanonicals — assetOnlyTypes", () => {
     db = makeDb();
   });
 
-  test("default behaviour: savings account with negative balance is clamped to 0", () => {
+  test("savings account with negative balance is clamped to 0", () => {
     const id = seedNegativeSavingsAccount(db);
     // "savings" is in DEFAULT_ASSET_ONLY_TYPES, so negatives clamp to 0
     expect(DEFAULT_ASSET_ONLY_TYPES.has("savings")).toBe(true);
 
-    const ctx = makeCtx(db, { today: "2021-01-15" }); // no walkerConfig → defaults apply
+    const ctx = makeCtx(db, { today: "2021-01-15" });
     const result = walkSeveralCanonicals(ctx, [id]);
     const series = result.get(id)!;
 
@@ -293,20 +223,5 @@ describe("walkSeveralCanonicals — assetOnlyTypes", () => {
     expect(series.get("2021-01-15")).toBe(0);
     // Balance on 2021-01-01 is +100 → positive, untouched
     expect(series.get("2021-01-01")).toBe(100);
-  });
-
-  test("custom empty assetOnlyTypes: negative balance passes through unclamped", () => {
-    const id = seedNegativeSavingsAccount(db);
-
-    const ctx = makeCtx(db, {
-      today: "2021-01-15",
-      walkerConfig: { assetOnlyTypes: new Set() }, // disable all clamping
-    });
-    const result = walkSeveralCanonicals(ctx, [id]);
-    const series = result.get(id)!;
-
-    expect(series).toBeDefined();
-    // Net balance on 2021-01-15 is −400; with no asset-only types it is NOT clamped
-    expect(series.get("2021-01-15")).toBe(-400);
   });
 });

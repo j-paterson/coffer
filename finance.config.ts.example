@@ -20,9 +20,4 @@ export default defineConfig({
     // geckoterminal: {},
     // coinbase:      {},
   },
-
-  // Optional: customize the walker
-  // walker: {
-  //   networthFloor: "2020-01-01",  // hide data before this date
-  // },
 });

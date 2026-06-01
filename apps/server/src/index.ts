@@ -26,13 +26,6 @@ declare module "hono" {
 
 const app = new Hono();
 
-// TODO(oss): load finance.config.ts at startup and populate walkerConfig.
-// The `walker` section of FinanceConfigInput (see packages/config/src/index.ts)
-// carries networthFloor and assetOnlyTypes as plain strings/arrays; convert
-// assetOnlyTypes to a Set<string> before assigning to ctx.walkerConfig.
-// Use the same dynamic-import pattern as apps/cli/src/config/load.ts.
-// Until then, walkerConfig is undefined and the walker uses its built-in
-// defaults (no floor, standard asset-only type set) — correct for most users.
 const ctx: Ctx = {
   db: openProductionDb(),
   today: todayISO(),

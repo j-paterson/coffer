@@ -59,15 +59,10 @@ balance assertions, and position snapshots. The dashboard's net-worth
 chart, spending breakdown, and investment views all run off the
 walker.
 
-Two knobs configurable via `finance.config.ts`:
-
-- **`walker.networthFloor`** — optional ISO date. Series before this
-  date are cropped. Useful when early data (e.g. small crypto dust)
-  makes recent history a sliver on the chart. Omit to see full history.
-- **`walker.assetOnlyTypes`** — set of account types whose negative
-  balances are clamped to zero. Default:
-  `["crypto", "brokerage", "retirement", "alt", "real_estate", "savings"]`.
-  Override to change clamping behavior for unusual account models.
+Defaults: assets in `crypto`, `brokerage`, `retirement`, `alt`,
+`real_estate`, and `savings` accounts are clamped to non-negative
+when their derived balance would otherwise go negative. Net worth
+is computed over full history; there is no walker floor.
 
 ## Storage
 

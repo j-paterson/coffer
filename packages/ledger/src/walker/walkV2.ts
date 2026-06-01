@@ -29,10 +29,6 @@ import { addDays } from "./dates";
 import { DEFAULT_ASSET_ONLY_TYPES } from "./balanceWalk";
 import { enabledSources, buildSessionTotalsCte } from "./cohort";
 
-// Note: a configurable walk floor (networthFloor) can be set via
-// ctx.walkerConfig.networthFloor. When set, dates before that value are
-// excluded from the emitted series. When absent, all history is included.
-
 /** Walk one canonical account (rolling up any merged aliases). Returns
  * a date → balance map covering [earliestSignal, today]. Empty map if
  * no postings/assertions exist. */
@@ -56,8 +52,6 @@ export function walkSeveralCanonicals(
   windowEnd?: string,
 ): Map<string, Map<string, number>> {
   if (canonicalIds.length === 0) return new Map();
-
-  const networthFloor = ctx.walkerConfig?.networthFloor;
 
   // Aliases (where merged_into points at any of these) plus the
   // canonicals themselves. Postings/assertions on either feed the same
@@ -216,8 +210,7 @@ export function walkSeveralCanonicals(
         const session = sessions[idx]!;
         if (
           session.from <= cursor &&
-          (!windowStart || cursor >= windowStart) &&
-          (!networthFloor || cursor >= networthFloor)
+          (!windowStart || cursor >= windowStart)
         ) {
           series.set(cursor, session.total);
         }
@@ -243,15 +236,14 @@ export function walkSeveralCanonicals(
       if (sorted.length > 0) {
       let cursor: string = sorted[0]!;
       let running = 0;
-      const assetOnlyTypes = ctx.walkerConfig?.assetOnlyTypes ?? DEFAULT_ASSET_ONLY_TYPES;
+      const assetOnlyTypes = DEFAULT_ASSET_ONLY_TYPES;
       const isAssetOnly = assetOnlyTypes.has(typeByCanonical.get(canonical) ?? "");
       while (cursor <= globalEnd) {
         if (anchors?.has(cursor)) running = anchors.get(cursor)!;
         else if (deltas?.has(cursor)) running += deltas.get(cursor) ?? 0;
         const stored = isAssetOnly && running < 0 ? 0 : running;
         if ((!windowStart || cursor >= windowStart) &&
-            (!windowEnd || cursor <= windowEnd) &&
-            (!networthFloor || cursor >= networthFloor)) {
+            (!windowEnd || cursor <= windowEnd)) {
           postings.set(cursor, stored);
         }
         cursor = addDays(cursor, 1);
