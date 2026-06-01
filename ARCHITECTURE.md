@@ -114,4 +114,5 @@ db/fixtures    Reproducible test datasets
 | GeckoTerminal | DEX-listed token prices (public, no auth) |
 
 All sources are HTTPS pulls initiated by the CLI or server. No data
-is sent outbound to any other party.
+is sent to a Coffer-controlled service or third-party analytics
+provider — calls go directly to the configured sources.
