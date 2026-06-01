@@ -42,8 +42,6 @@ def _post_crypto_sync() -> None:
       makes repeat runs cheap.
     - ``backfill crypto``: Zerion fungible-chart per-symbol history,
       24h cached. Fills position_snapshots for EVM wallets.
-    - ``backfill qty-walk``: pure DB — walks CoinTracker tx history to
-      fill per-symbol quantity trajectories. No network.
     """
     print()
     print("backfill: asset_prices + wallet holdings...")
@@ -58,12 +56,6 @@ def _post_crypto_sync() -> None:
         backfill_crypto.print_report(st)
     except Exception as e:
         print(f"  crypto: {e}")
-    try:
-        from . import backfill_quantity_walk
-        st = backfill_quantity_walk.run()
-        backfill_quantity_walk.print_report(st)
-    except Exception as e:
-        print(f"  qty-walk: {e}")
 
 
 def _post_brokerage_sync() -> None:
@@ -107,92 +99,18 @@ def _post_write_reconcile() -> None:
 
 def cmd_ingest(args: argparse.Namespace) -> int:
     source = args.source
-    if source == "kubera":
-        total = ingest.ingest_kubera()
-    elif source == "chase-statements":
-        total = ingest.ingest_chase_statements(dry_run=args.dry_run)
-    elif source == "ledger-ops":
+    if source == "ledger-ops":
         if not args.path:
             print("ledger-ops requires --path to the operations CSV")
             return 1
         total = ingest.ingest_ledger_operations(
             Path(args.path), dry_run=args.dry_run
         )
-    elif source == "kubera-recap":
-        if not args.path:
-            print("kubera-recap requires --path to one or more CSV files")
-            return 1
-        from . import db as _db
-        from .parsers import kubera_recap
-        paths = [Path(p.strip()) for p in args.path.split(",") if p.strip()]
-        total_written = 0
-        with _db.connect() as conn:
-            for p in paths:
-                if not p.exists():
-                    print(f"  skip {p}: not found")
-                    continue
-                print(f"parsing {p.name}")
-                stats = kubera_recap.parse(p, conn)
-                kubera_recap.print_stats(stats)
-                total_written += stats.assertions_written
-        print(f"\ntotal assertions written: {total_written}")
-        return 0
-    elif source == "masterworks-k1":
-        from . import db as _db
-        from .parsers import masterworks_k1
-        folder = (
-            Path(args.path)
-            if args.path
-            else Path(__file__).resolve().parents[3]
-                / "raw" / "investments" / "masterworks"
-        )
-        if not folder.exists():
-            print(f"folder not found: {folder}")
-            return 1
-        print(f"parsing K-1s in {folder}")
-        with _db.connect() as conn:
-            stats = masterworks_k1.ingest_directory(folder, conn)
-        masterworks_k1.print_stats(stats)
-        return 0
-    elif source == "cointracker":
-        if not args.path:
-            print("cointracker requires --path to one or more CSV files")
-            return 1
-        from . import db as _db
-        from .parsers import cointracker_v2
-        paths = [Path(p.strip()) for p in args.path.split(",") if p.strip()]
-        with _db.connect() as conn:
-            for p in paths:
-                if not p.exists():
-                    print(f"  skip {p}: not found")
-                    continue
-                print(f"parsing {p.name}")
-                stats = cointracker_v2.parse(p, conn)
-                cointracker_v2.print_stats(stats)
-        _post_write_reconcile()
-        return 0
-    elif source == "cointracker-lots":
-        if not args.path:
-            print("cointracker-lots requires --path to one or more CSV files")
-            return 1
-        from . import db as _db
-        from .parsers import cointracker_lots
-        paths = [Path(p.strip()) for p in args.path.split(",") if p.strip()]
-        with _db.connect() as conn:
-            for p in paths:
-                if not p.exists():
-                    print(f"  skip {p}: not found")
-                    continue
-                print(f"parsing {p.name}")
-                stats = cointracker_lots.parse(p, conn)
-                cointracker_lots.print_stats(stats)
-        return 0
     else:
         print(f"unknown source: {source}")
         return 1
     print(f"\ntotal: {total.as_dict()}")
-    if source in {"chase-statements", "ledger-ops"}:
-        _post_write_reconcile()
+    _post_write_reconcile()
     return 0
 
 
@@ -306,32 +224,6 @@ def cmd_sync(args: argparse.Namespace) -> int:
         _post_crypto_sync()
         return 0
     print(f"unknown source: {source}")
-    return 1
-
-
-def cmd_scrape(args: argparse.Namespace) -> int:
-    target = args.target
-    if target == "chase":
-        from .scrapers import chase as chase_scraper
-        if args.login:
-            chase_scraper.login_interactive()
-            return 0
-        suffixes = (
-            [s.strip() for s in args.accounts.split(",") if s.strip()]
-            if args.accounts
-            else None
-        )
-        stats = chase_scraper.scrape_all(
-            headed=not args.headless,
-            days=args.days,
-            ingest_after=not args.no_ingest,
-            only_suffixes=suffixes,
-        )
-        chase_scraper.print_report(stats)
-        if not args.no_ingest:
-            _post_write_reconcile()
-        return 0
-    print(f"unknown scrape target: {target}")
     return 1
 
 
@@ -469,11 +361,11 @@ def cmd_accounts(args: argparse.Namespace) -> int:
               f"`finance accounts merge <alias> <canonical>`):")
         for m in matches:
             print(
-                f"  {m.kubera_id[:55]:<57} → {m.simplefin_id[:55]:<57}  "
+                f"  {m.manual_id[:55]:<57} → {m.live_id[:55]:<57}  "
                 f"[{m.matched_on}]"
             )
             print(
-                f"    {m.kubera_name[:55]:<57}    {m.simplefin_name[:55]}"
+                f"    {m.manual_name[:55]:<57}    {m.live_name[:55]}"
             )
         return 0
     if sub == "list-merged":
@@ -553,11 +445,6 @@ def cmd_backfill(args: argparse.Namespace) -> int:
     if what == "crypto":
         stats = backfill_crypto.backfill_crypto(days=args.days)
         backfill_crypto.print_report(stats)
-        return 0
-    if what == "qty-walk":
-        from . import backfill_quantity_walk
-        stats = backfill_quantity_walk.run()
-        backfill_quantity_walk.print_report(stats)
         return 0
     if what == "coingecko":
         from . import backfill_coingecko
@@ -675,16 +562,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_status = sub.add_parser("status", help="Show applied migrations")
     p_status.set_defaults(func=cmd_status)
 
-    p_ingest = sub.add_parser("ingest", help="Ingest data from raw/")
+    p_ingest = sub.add_parser("ingest", help="Ingest data from a CSV file")
     p_ingest.add_argument(
         "source",
-        choices=["kubera", "kubera-recap", "chase-statements", "ledger-ops", "cointracker", "cointracker-lots", "masterworks-k1"],
+        choices=["ledger-ops"],
         help="Data source to ingest",
     )
     p_ingest.add_argument(
         "--path",
         default=None,
-        help="Explicit file path (used by ledger-ops)",
+        help="Explicit file path to the CSV",
     )
     p_ingest.add_argument(
         "--dry-run",
@@ -937,7 +824,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_src_l = src_sub.add_parser("list", help="Show all data sources")
     p_src_l.set_defaults(func=cmd_sources)
     p_src_t = src_sub.add_parser("toggle", help="Flip enabled flag")
-    p_src_t.add_argument("name", help="Source name (e.g. kubera-recap)")
+    p_src_t.add_argument("name", help="Source name (e.g. simplefin)")
     p_src_t.add_argument("--kind", choices=["assertion", "snapshot"],
                          help="Restrict to one kind (default: both)")
     p_src_t.set_defaults(func=cmd_sources)
@@ -947,46 +834,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_src_r.add_argument("new_rank", type=int)
     p_src_r.set_defaults(func=cmd_sources)
 
-    p_scrape = sub.add_parser(
-        "scrape",
-        help="Automate downloading statements from an institution's website",
-    )
-    p_scrape.add_argument("target", choices=["chase"])
-    p_scrape.add_argument(
-        "--login",
-        action="store_true",
-        help="Open a real browser so you can log in + 2FA; saves the session",
-    )
-    p_scrape.add_argument(
-        "--headless",
-        action="store_true",
-        help=(
-            "Hide the browser window. Off by default — Chase fingerprints "
-            "headless Chromium and redirects to a system-requirements page."
-        ),
-    )
-    p_scrape.add_argument(
-        "--days", type=int, default=730, help="How far back to download (default 730)"
-    )
-    p_scrape.add_argument(
-        "--accounts",
-        default=None,
-        help="Comma-separated list of 4-digit suffixes to scope to",
-    )
-    p_scrape.add_argument(
-        "--no-ingest",
-        action="store_true",
-        help="Download only — don't run ingest afterward",
-    )
-    p_scrape.set_defaults(func=cmd_scrape)
-
     p_bf = sub.add_parser(
         "backfill",
         help="Synthesize historical data from external sources",
     )
     p_bf.add_argument(
         "what",
-        choices=["prices", "crypto", "qty-walk", "coingecko", "defillama", "alchemy-history", "dex-basis"],
+        choices=["prices", "crypto", "coingecko", "defillama", "alchemy-history", "dex-basis"],
         help=(
             "prices: daily equity closes × current holdings; "
             "crypto: Zerion fungible charts × current positions"

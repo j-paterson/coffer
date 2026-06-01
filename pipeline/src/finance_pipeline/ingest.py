@@ -9,11 +9,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import db, ledger, positions as positions_mod, reconcile
-from .config import RAW_CHASE, RAW_KUBERA
+from . import db, ledger, positions as positions_mod
 from .env import load_env
-from .parsers import chase_ofx, chase_pdf, cointracker_csv, kubera, ledger_csv, simplefin
-from .parsers.base import BalanceRow, ParseResult, TransactionRow
+from .parsers import ledger_csv, simplefin
+from .parsers.base import ParseResult, TransactionRow
 
 
 def _holding_source(account_id: str) -> str:
@@ -23,7 +22,6 @@ def _holding_source(account_id: str) -> str:
     for prefix, tag in (
         ("simplefin:", "simplefin"),
         ("zerion:", "zerion"),
-        ("kubera:", "kubera"),
         ("alchemy:", "alchemy"),
     ):
         if account_id.startswith(prefix):
@@ -35,10 +33,8 @@ def _source_tag(tx_id: str) -> str:
     """Map a v1-style synthetic txn id prefix to a v2 source tag."""
     for prefix, tag in (
         ("sf:", "simplefin"),
-        ("chase:", "chase-statement"),
         ("wealthfront:", "wealthfront"),
         ("schwab:", "schwab"),
-        ("cointracker:", "cointracker"),
         ("ledger:", "ledger-csv"),
         ("synthetic:", "synthetic"),
     ):
@@ -178,192 +174,6 @@ def _mirror_v2_txn(conn, tx: TransactionRow) -> bool:
     return True
 
 
-def ingest_kubera(folder: Path | None = None) -> WriteCounts:
-    """Ingest Kubera snapshots.
-
-    If folder is None, ingests every YYYY-MM-DD subfolder of raw/kubera/.
-    """
-    total = WriteCounts()
-
-    if folder is not None:
-        snapshots = [folder]
-    else:
-        if not RAW_KUBERA.exists():
-            print(f"no kubera dir at {RAW_KUBERA}")
-            return total
-        snapshots = sorted(p for p in RAW_KUBERA.iterdir() if p.is_dir())
-
-    if not snapshots:
-        print("no kubera snapshots found")
-        return total
-
-    for snap in snapshots:
-        print(f"parsing kubera snapshot: {snap.name}")
-        result = kubera.parse(snap)
-        for w in result.warnings:
-            print(f"  warning: {w}")
-        counts = write_result(result)
-        total.add(counts)
-        print(
-            f"  accounts={counts.accounts} balances={counts.balances} "
-            f"holdings={counts.holdings}"
-        )
-
-    return total
-
-
-def ingest_chase_statements(
-    folder: Path | None = None,
-    dry_run: bool = False,
-) -> WriteCounts:
-    """Ingest every OFX/QFX/CSV statement in ``raw/chase/`` (or a specified
-    folder), matching each file's ACCTID against an existing SimpleFIN
-    account by the last 4+ digits of the account number embedded in its
-    display name (e.g. "Checking (8166)").
-
-    Files land multiple times across runs — dedup is handled at the
-    transactions PK level, so re-running is safe and a no-op when nothing
-    is new.
-    """
-    total = WriteCounts()
-    folder = folder or RAW_CHASE
-    if not folder.exists():
-        print(f"no chase dir at {folder}")
-        return total
-
-    # Build a (suffix -> account_id) index from the accounts table so we
-    # can map Chase ACCTIDs to our canonical ids.
-    suffix_to_id = _chase_suffix_index()
-    if not suffix_to_id:
-        print("no Chase accounts found in DB — run `sync simplefin` first")
-        return total
-
-    files = sorted(
-        p for p in folder.iterdir()
-        if p.is_file() and p.suffix.lower() in (".ofx", ".qfx", ".csv", ".pdf")
-    )
-    if not files:
-        print(f"no statement files in {folder}")
-        return total
-
-    for path in files:
-        stmt = None
-        if path.suffix.lower() == ".pdf":
-            stmt = chase_pdf.parse(path)
-        else:
-            # CSV files lack embedded ACCTID — infer from filename or skip.
-            acctid_override = None
-            if path.suffix.lower() == ".csv":
-                acctid_override = chase_ofx.acctid_from_filename(path.name)
-                if not acctid_override:
-                    print(f"  skip {path.name}: CSV needs a digit suffix in filename")
-                    continue
-            stmt = chase_ofx.parse_statement(path, acctid_override=acctid_override)
-        if stmt is None:
-            print(f"  skip {path.name}: unrecognized layout (no period / acctid)")
-            continue
-
-        account_id = _match_account(stmt.acctid, suffix_to_id)
-        if account_id is None:
-            print(
-                f"  skip {path.name}: Chase ACCTID {stmt.acctid} doesn't match "
-                f"any existing account (run `sync simplefin` to create it)"
-            )
-            continue
-
-        # Rewrite every txn's account_id to the matched one.
-        for t in stmt.txns:
-            t.account_id = account_id
-
-        if dry_run:
-            print(
-                f"  dry-run {path.name}: {len(stmt.txns)} txns "
-                f"would be written to {account_id}"
-            )
-            continue
-
-        result = ParseResult()
-        result.transactions.extend(stmt.txns)
-        for (as_of, value) in stmt.balance_anchors:
-            result.balances.append(
-                BalanceRow(
-                    account_id=account_id,
-                    as_of=as_of,
-                    value_usd=value,
-                    source="chase-statement",
-                )
-            )
-        counts = write_result(result)
-        total.add(counts)
-        print(
-            f"  {path.name}: {counts.transactions} new / {len(stmt.txns)} "
-            f"parsed, {counts.balances} balance anchors  ->  {account_id}"
-        )
-
-    return total
-
-
-def _chase_suffix_index() -> dict[str, str]:
-    """Return {account-suffix: our_account_id} for every active live
-    account (Chase, Schwab, Wealthfront, etc.). Statement CSVs from any
-    of these institutions are matched via a digit suffix embedded in
-    the filename → SimpleFIN account id."""
-    import re
-    out: dict[str, str] = {}
-    with db.connect() as conn:
-        rows = conn.execute(
-            """
-            SELECT id, display_name FROM accounts
-            WHERE active = 1 AND mode = 'live'
-            """
-        ).fetchall()
-    for acct_id, name in rows:
-        # Grab any parenthesized digit group or trailing digits.
-        # SimpleFIN names look like "Checking (8166)", "Individual ...937
-        # (937)", "Individual 3.30% APY (5006)".
-        for m in re.finditer(r"\((\d{3,})\)|(\d{4,})\b", name or ""):
-            digits = m.group(1) or m.group(2)
-            if digits and digits not in out:
-                out[digits] = acct_id
-    return out
-
-
-def _match_account(chase_acctid: str, suffix_index: dict[str, str]) -> str | None:
-    """Match a full Chase ACCTID (e.g. a 10+ digit string) to our account
-    id by suffix containment."""
-    # Strategy: our display-name suffixes are usually 4 digits. Try each
-    # known suffix and accept the one that matches the END of chase_acctid.
-    # Fall back to exact equality for unusual cases.
-    if chase_acctid in suffix_index:
-        return suffix_index[chase_acctid]
-    for suffix, acct_id in suffix_index.items():
-        if chase_acctid.endswith(suffix):
-            return acct_id
-    return None
-
-
-def ingest_cointracker(
-    paths: list[Path], dry_run: bool = False
-) -> WriteCounts:
-    """Ingest one or more CoinTracker CSV exports. Dedups across files
-    by Transaction ID so passing overlapping exports is safe."""
-    total = WriteCounts()
-    existing = [p for p in paths if p.exists()]
-    if not existing:
-        print("no CoinTracker csv files provided")
-        return total
-    with db.connect() as conn:
-        result, stats = cointracker_csv.parse(existing, conn)
-    print(f"parsing CoinTracker exports: {[p.name for p in existing]}")
-    cointracker_csv.print_stats(stats)
-    if dry_run or not result.transactions:
-        return total
-    counts = write_result(result)
-    total.add(counts)
-    print(f"\nwrote {counts.transactions} new transactions")
-    return total
-
-
 def ingest_ledger_operations(
     path: Path, dry_run: bool = False
 ) -> WriteCounts:
@@ -477,19 +287,6 @@ def sync_simplefin(start_days: int = 365, force: bool = False, _emit_run_bracket
         for aid in seen_account_ids:
             events.account_log(account_id=aid, message=f"wrote postings for {aid}")
             events.account_finished(account_id=aid, ok=True)
-
-        # Auto-reconcile: archive Kubera accounts that are now superseded by
-        # the SimpleFIN version (strict suffix + institution match).
-        with db.connect() as conn:
-            matches = reconcile.find_matches(conn)
-            if matches:
-                print(f"\nreconciling {len(matches)} Kubera accounts -> SimpleFIN:")
-                for m in matches:
-                    print(f"  archive kubera '{m.kubera_name}' -> {m.simplefin_name} [{m.matched_on}]")
-                archived = reconcile.apply_matches(conn, matches)
-                print(f"  archived {archived} Kubera accounts")
-            else:
-                print("\nreconcile: no new matches")
 
         if _emit_run_brackets:
             events.sync_finished(

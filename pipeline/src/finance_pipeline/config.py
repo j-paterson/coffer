@@ -11,11 +11,6 @@ DB_PATH = DB_DIR / "finance.sqlite"
 MIGRATIONS_DIR = DB_DIR / "migrations"
 
 RAW_DIR = PROJECT_ROOT / "raw"
-RAW_CARDS = RAW_DIR / "cards"
-RAW_CHECKING = RAW_DIR / "checking"
-RAW_INVESTMENTS = RAW_DIR / "investments"
-RAW_KUBERA = RAW_DIR / "kubera"
-RAW_CHASE = RAW_DIR / "chase"
 RAW_INBOX = RAW_DIR / "_inbox"
 
 BACKUPS_DIR = PROJECT_ROOT / "backups"
