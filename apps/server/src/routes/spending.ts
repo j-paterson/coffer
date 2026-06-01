@@ -30,13 +30,9 @@ import type {
 
 const route = new Hono();
 
-// Predicate fragment: this posting is a real spend, not a transfer
-// leg or crypto wallet movement.
+// Predicate fragment: this posting is a real spend, not a transfer leg.
 //
 //   - amount < 0 on a real (non-equity) account
-//   - not derived from CoinTracker — CoinTracker rows are wallet
-//     movements (BUY/SELL/SEND/RECEIVE/TRADE), not merchant spending;
-//     including them inflates "Crypto" with $200k+ of pure transfers
 //   - the txn has no other posting on a real account (= it's
 //     one-sided to equity:unknown-counterparty, the merchant slot)
 //   - excluded_from_spending = 0 (default; flipped via PATCH below)
@@ -47,7 +43,6 @@ const route = new Hono();
 const SPEND_PREDICATE = `
   p.amount < 0
   AND p.account_id NOT LIKE 'equity:%'
-  AND t.derived_by != 'cointracker'
   AND t.excluded_from_spending = 0
   AND NOT EXISTS (
     SELECT 1 FROM postings p2
@@ -78,7 +73,6 @@ route.get("/by-category", (c) => {
       JOIN transactions_v2 t ON t.id = p.txn_id
       WHERE p.amount < 0
         AND p.account_id NOT LIKE 'equity:%'
-        AND t.derived_by != 'cointracker'
         AND t.excluded_from_spending = 0
         AND COALESCE(
           (SELECT i.category FROM transaction_items i WHERE i.transaction_v2_id = t.id ORDER BY i.id LIMIT 1),
@@ -109,7 +103,6 @@ route.get("/by-category", (c) => {
     JOIN transactions_v2 t ON t.id = p.txn_id
     WHERE p.amount < 0
       AND p.account_id NOT LIKE 'equity:%'
-      AND t.derived_by != 'cointracker'
       AND t.excluded_from_spending = 0
       AND COALESCE(
         (SELECT i.category FROM transaction_items i WHERE i.transaction_v2_id = t.id ORDER BY i.id LIMIT 1),
@@ -265,7 +258,6 @@ route.get("/items-by-category", (c) => {
        WHERE ${whereSql}
          AND p.amount < 0
          AND p.account_id NOT LIKE 'equity:%'
-         AND t.derived_by != 'cointracker'
          AND t.excluded_from_spending = 0
          AND NOT EXISTS (
            SELECT 1 FROM postings p2
@@ -286,7 +278,6 @@ route.get("/items-by-category", (c) => {
        WHERE ${whereSql}
          AND p.amount < 0
          AND p.account_id NOT LIKE 'equity:%'
-         AND t.derived_by != 'cointracker'
          AND t.excluded_from_spending = 0
          AND NOT EXISTS (
            SELECT 1 FROM postings p2

@@ -1,11 +1,10 @@
 import { test, expect, type Page, type APIRequestContext, type Response } from "@playwright/test";
 
-const PROJECTIONS_URL = "/projections";
+const PROJECTIONS_URL = "/projections/heloc";
 
 async function gotoAndWaitForFirstRun(page: Page): Promise<Response> {
   const firstRun = page.waitForResponse((r) => r.url().includes("/api/projections/run") && r.status() === 200);
   await page.goto(PROJECTIONS_URL);
-  await expect(page.getByRole("heading", { name: "Projections" })).toBeVisible();
   const resp = await firstRun;
   await expect(page.getByText("Net worth projection")).toBeVisible();
   return resp;

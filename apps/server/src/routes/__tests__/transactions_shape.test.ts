@@ -7,7 +7,7 @@
 import { test, expect, beforeEach, afterEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { Hono } from "hono";
-import transactionsRoute from "../transactions_v2";
+import transactionsRoute from "../transactions";
 import type { Ctx } from "../../ctx";
 import { applyMigrations } from "../../db";
 import type { AccountTransactionsGroup } from "../../../../../packages/shared/types";

@@ -12,7 +12,7 @@
  *              warning instead of the residual line.
  *   - Top tokens from Alchemy (symbol + value).
  *
- * Rendered from data returned by GET /api/v2/accounts/wallets/:addr/composition.
+ * Rendered from data returned by GET /api/accounts/wallets/:addr/composition.
  */
 
 import { useWalletComposition } from "../../lib/queries";

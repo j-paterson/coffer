@@ -80,7 +80,7 @@ async function get<T>(path: string): Promise<T> {
 }
 
 export const api = {
-  accounts: () => get<Account[]>("/api/v2/accounts"),
+  accounts: () => get<Account[]>("/api/accounts"),
   summary: () => get<Summary>("/api/summary"),
   transactionsByAccount: (limit = 20) =>
     get<AccountTransactionsGroup[]>(
@@ -92,7 +92,7 @@ export const api = {
     if (params?.to) q.set("to", params.to);
     const qs = q.toString();
     return get<SpendingBreakdown>(
-      `/api/v2/spending/by-category${qs ? `?${qs}` : ""}`,
+      `/api/spending/by-category${qs ? `?${qs}` : ""}`,
     );
   },
   spendingTransactions: (params: {
@@ -106,7 +106,7 @@ export const api = {
     if (params.from) q.set("from", params.from);
     if (params.to) q.set("to", params.to);
     if (params.includeExcluded) q.set("include_excluded", "1");
-    return get<SpendingTransactionsResponse>(`/api/v2/spending/transactions?${q.toString()}`);
+    return get<SpendingTransactionsResponse>(`/api/spending/transactions?${q.toString()}`);
   },
   spendingItemsByCategory: (params: {
     parent: string;
@@ -118,28 +118,28 @@ export const api = {
     if (params.from) q.set("from", params.from);
     if (params.to) q.set("to", params.to);
     return get<ItemsByCategory>(
-      `/api/v2/spending/items-by-category?${q.toString()}`,
+      `/api/spending/items-by-category?${q.toString()}`,
     );
   },
   accountHoldingsHistory: (accountId: string, days = 90) =>
-    get<HoldingsHistoryResponse>(`/api/v2/accounts/${encodeURIComponent(accountId)}/holdings-history?days=${days ?? "all"}`),
+    get<HoldingsHistoryResponse>(`/api/accounts/${encodeURIComponent(accountId)}/holdings-history?days=${days ?? "all"}`),
   walletComposition: (address: string, date?: string) =>
     get<WalletCompositionResponse>(
-      `/api/v2/accounts/wallets/${encodeURIComponent(address)}/composition` +
+      `/api/accounts/wallets/${encodeURIComponent(address)}/composition` +
         (date ? `?date=${date}` : ""),
     ),
   walletHistory: (address: string, days = 365) =>
-    get<HoldingsHistoryResponse>(`/api/v2/accounts/wallets/${encodeURIComponent(address)}/history?days=${days}`),
+    get<HoldingsHistoryResponse>(`/api/accounts/wallets/${encodeURIComponent(address)}/history?days=${days}`),
   bundleHistory: (institution: string, days = 365) =>
     get<HoldingsHistoryResponse>(
-      `/api/v2/accounts/bundle/${encodeURIComponent(institution)}/history?days=${days}`,
+      `/api/accounts/bundle/${encodeURIComponent(institution)}/history?days=${days}`,
     ),
   patchAccountName: async (
     accountId: string,
     override: string | null,
   ): Promise<{ id: string; display_name_override: string | null }> => {
     const res = await fetch(
-      `/api/v2/accounts/${encodeURIComponent(accountId)}`,
+      `/api/accounts/${encodeURIComponent(accountId)}`,
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -172,7 +172,7 @@ export const api = {
     txnId: string,
     excluded: boolean,
   ): Promise<{ ok: true; excluded: boolean }> => {
-    const res = await fetch(`/api/v2/spending/transactions/${txnId}/exclude`, {
+    const res = await fetch(`/api/spending/transactions/${txnId}/exclude`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ excluded }),
@@ -345,9 +345,9 @@ export const api = {
     return res.json();
   },
   netWorthSeries: (granularity: "day" | "week" | "month" | "year" = "day") =>
-    get<NetWorthPoint[]>(`/api/v2/networth/series?granularity=${granularity}`),
+    get<NetWorthPoint[]>(`/api/networth/series?granularity=${granularity}`),
   netWorthBreakdown: (granularity: "day" | "week" | "month" | "year" = "day") =>
-    get<HoldingsHistoryResponse>(`/api/v2/networth/breakdown?granularity=${granularity}`),
+    get<HoldingsHistoryResponse>(`/api/networth/breakdown?granularity=${granularity}`),
   investmentsSeries: (params?: {
     granularity?: string;
     from?: string;
@@ -358,7 +358,7 @@ export const api = {
     if (params?.from) q.set("from", params.from);
     if (params?.to) q.set("to", params.to);
     const qs = q.toString();
-    return get<InvestmentsSeriesResponse>(`/api/v2/investments/series${qs ? `?${qs}` : ""}`);
+    return get<InvestmentsSeriesResponse>(`/api/investments/series${qs ? `?${qs}` : ""}`);
   },
   investmentsCostBasis: () =>
     get<{
@@ -390,17 +390,17 @@ export const api = {
         snapshot_cost_basis: number;
         combined_cost_basis: number;
       };
-    }>("/api/v2/investments/cost-basis"),
+    }>("/api/investments/cost-basis"),
   investmentsTrades: (params?: { from?: string; to?: string }) => {
     const q = new URLSearchParams();
     if (params?.from) q.set("from", params.from);
     if (params?.to) q.set("to", params.to);
     const qs = q.toString();
-    return get<TradeRow[]>(`/api/v2/investments/trades${qs ? `?${qs}` : ""}`);
+    return get<TradeRow[]>(`/api/investments/trades${qs ? `?${qs}` : ""}`);
   },
   investmentsRealizedSeries: (granularity = "month") =>
-    get<InvestmentsRealizedSeriesResponse>(`/api/v2/investments/realized-series?granularity=${granularity}`),
-  investmentsHoldings: () => get<InvestmentsHoldingsResponse>("/api/v2/investments/holdings"),
+    get<InvestmentsRealizedSeriesResponse>(`/api/investments/realized-series?granularity=${granularity}`),
+  investmentsHoldings: () => get<InvestmentsHoldingsResponse>("/api/investments/holdings"),
   investmentsDefiBreakdown: () =>
     get<{
       as_of: string;
@@ -421,8 +421,8 @@ export const api = {
           }[];
         }[];
       }[];
-    }>("/api/v2/investments/defi-breakdown"),
-  basisOverrides: () => get<BasisOverride[]>("/api/v2/investments/basis-overrides"),
+    }>("/api/investments/defi-breakdown"),
+  basisOverrides: () => get<BasisOverride[]>("/api/investments/basis-overrides"),
   upsertBasisOverride: async (payload: {
     symbol: string;
     account_id?: string | null;
@@ -430,7 +430,7 @@ export const api = {
     quantity_at_entry?: number | null;
     note?: string | null;
   }) => {
-    const res = await fetch("/api/v2/investments/basis-overrides", {
+    const res = await fetch("/api/investments/basis-overrides", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -439,7 +439,7 @@ export const api = {
     return res.json();
   },
   deleteBasisOverride: async (id: number) => {
-    const res = await fetch(`/api/v2/investments/basis-overrides/${id}`, {
+    const res = await fetch(`/api/investments/basis-overrides/${id}`, {
       method: "DELETE",
     });
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -450,7 +450,7 @@ export const api = {
     if (params?.from) q.set("from", params.from);
     if (params?.to) q.set("to", params.to);
     const qs = q.toString();
-    return get<InvestmentFlowRow[]>(`/api/v2/investments/flows${qs ? `?${qs}` : ""}`);
+    return get<InvestmentFlowRow[]>(`/api/investments/flows${qs ? `?${qs}` : ""}`);
   },
   goals: {
     list: (includeArchived = false) =>

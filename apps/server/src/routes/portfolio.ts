@@ -7,7 +7,7 @@
  *
  * Source-priority resolution kicks in per-position before the grouping
  * (same window function as the accounts dropdown), so a position seen by
- * Zerion + Kubera contributes once at the higher-trust value.
+ * multiple sources contributes once at the higher-trust value.
  */
 
 import { Hono } from "hono";

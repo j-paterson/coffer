@@ -124,7 +124,7 @@ route.get("/breakdown", (c) => {
   const { seriesByAcct, globalStart, globalEnd, accounts, typeByCanonical } = w;
 
   // Bucket key = canonical_id. One row per real canonical account, so
-  // every breakdown entry traces to an account in /api/v2/accounts.
+  // every breakdown entry traces to an account in /api/accounts.
   // Display name comes from the canonical account's row (its
   // display_name_override / display_name); aliases just contribute
   // value, they don't get their own row.

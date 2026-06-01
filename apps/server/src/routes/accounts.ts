@@ -21,8 +21,7 @@ route.get("/", (c) => {
   // Only show canonical accounts in the listing — merged aliases are
   // hidden from the user but their postings still roll up. Inactive
   // canonicals are excluded: their historical postings lack a current
-  // anchor and would appear as phantom balances (e.g. the legacy
-  // CoinTracker bundle whose postings sum to >$1M but holds nothing).
+  // anchor and would appear as phantom balances.
   const ctx = c.get("ctx") as Ctx;
   const accounts = ctx.db
     .prepare(
@@ -426,7 +425,7 @@ route.get("/bundle/:institution/history", (c) => {
   return c.json({ snapshots });
 });
 
-// GET /api/v2/accounts/wallets/:address/composition?date=YYYY-MM-DD
+// GET /api/accounts/wallets/:address/composition?date=YYYY-MM-DD
 //
 // For a multi-chain Zerion wallet at one address: at the given date,
 // return the wallet's authoritative total (from zerion-chart assertions
@@ -537,7 +536,7 @@ route.get("/wallets/:address/composition", (c) => {
   return c.json({ address, date, per_chain: perChain, totals });
 });
 
-// PATCH /api/v2/accounts/:id — update display_name_override.
+// PATCH /api/accounts/:id — update display_name_override.
 //
 // `wallet-group:<addr>` is a synthetic id from the view-group layer —
 // there's no row in `accounts` to update. Fan out to every per-chain

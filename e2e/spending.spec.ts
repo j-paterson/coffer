@@ -51,7 +51,7 @@ test("right-click ignore + show-ignored pill recovers row", async ({ page }) => 
 
   // Click the pill → ignored row reappears, muted.
   const refetch = page.waitForResponse(
-    (r) => r.url().includes("/api/v2/spending/transactions") && r.url().includes("include_excluded=1"),
+    (r) => r.url().includes("/api/spending/transactions") && r.url().includes("include_excluded=1"),
   );
   await showIgnored.click();
   await refetch;
