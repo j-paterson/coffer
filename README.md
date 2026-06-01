@@ -48,6 +48,32 @@ run; you'll see an empty dashboard until you enable a parser and run a sync.
 Edit `finance.config.ts` to enable parsers and set walker options.
 API keys live in `.env`. See `.env.example` for the full list.
 
+## CLI
+
+The dashboard's sync button invokes the same CLI under the hood. To run a
+sync from a terminal (cron jobs, scripted backfills, etc.):
+
+```bash
+bun apps/cli/src/index.ts sync <parser-id>
+```
+
+Available parsers: `simplefin`, `defillama`, `zerion`, `alchemy`,
+`geckoterminal`, `coinbase`.
+
+Flags:
+
+| Flag | Effect |
+|------|--------|
+| `--days N` | (simplefin only) override `lookback_days` |
+| `--config <path>` | use a non-default `finance.config.ts` |
+| `--events-fd N` | emit sync progress as JSON lines on file descriptor `N` |
+
+Example:
+
+```bash
+bun apps/cli/src/index.ts sync simplefin --days 30
+```
+
 ## Categorization & sidecar (optional)
 
 Coffer ships with a Python sidecar in `pipeline/` that handles rule-based
