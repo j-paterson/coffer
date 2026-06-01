@@ -54,7 +54,7 @@ run; you'll see an empty dashboard until you enable a parser and run a sync.
 
 ## Configuration
 
-Edit `finance.config.ts` to enable parsers and set walker options.
+Edit `finance.config.ts` to enable parsers.
 API keys live in `.env`. See `.env.example` for the full list.
 
 ## CLI

@@ -12,15 +12,20 @@ from . import backup as backup_mod
 from . import categorize as categorize_mod
 from . import db, ingest
 from . import trips as trips_mod
-from .emails import aggregate as email_aggregate
-from .emails import classify as email_classify
-from .emails import classify_kind as email_classify_kind
-from .emails import extract as email_extract
-from .emails import fetcher as email_fetcher
-from .emails import match as email_match
-from .emails import merchant_lookup
-from .emails import shorten as email_shorten
 from .config import RULES_PATH
+
+try:
+    from .emails import aggregate as email_aggregate
+    from .emails import classify as email_classify
+    from .emails import classify_kind as email_classify_kind
+    from .emails import extract as email_extract
+    from .emails import fetcher as email_fetcher
+    from .emails import match as email_match
+    from .emails import merchant_lookup
+    from .emails import shorten as email_shorten
+    _EMAIL_AVAILABLE = True
+except ImportError:
+    _EMAIL_AVAILABLE = False
 
 
 def cmd_migrate(_args: argparse.Namespace) -> int:
@@ -185,6 +190,13 @@ def cmd_sync(args: argparse.Namespace) -> int:
         _post_brokerage_sync()
         return 0
     if source == "email":
+        if not _EMAIL_AVAILABLE:
+            print(
+                "error: email sync requires the [email] extras. "
+                "Run: pip install -e ./pipeline[email]",
+                file=sys.stderr,
+            )
+            return 1
         stats = email_fetcher.sync(
             query=args.query or email_fetcher.DEFAULT_QUERY,
             max_results=args.max_results,
@@ -648,89 +660,90 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_cat.set_defaults(func=cmd_categorize)
 
-    p_extract = sub.add_parser(
-        "extract-email",
-        help="Run NuExtract on pending emails and write receipt fields",
-    )
-    p_extract.add_argument(
-        "--limit",
-        type=int,
-        default=50,
-        help="Max pending emails to process in this run (default: 50)",
-    )
-    p_extract.set_defaults(func=cmd_extract_email)
+    if _EMAIL_AVAILABLE:
+        p_extract = sub.add_parser(
+            "extract-email",
+            help="Run NuExtract on pending emails and write receipt fields",
+        )
+        p_extract.add_argument(
+            "--limit",
+            type=int,
+            default=50,
+            help="Max pending emails to process in this run (default: 50)",
+        )
+        p_extract.set_defaults(func=cmd_extract_email)
 
-    p_match = sub.add_parser(
-        "match-email",
-        help="Match extracted email receipts to transactions",
-    )
-    p_match.add_argument(
-        "--refresh",
-        action="store_true",
-        help="Re-match already-matched emails (default: only unmatched)",
-    )
-    p_match.set_defaults(func=cmd_match_email)
+        p_match = sub.add_parser(
+            "match-email",
+            help="Match extracted email receipts to transactions",
+        )
+        p_match.add_argument(
+            "--refresh",
+            action="store_true",
+            help="Re-match already-matched emails (default: only unmatched)",
+        )
+        p_match.set_defaults(func=cmd_match_email)
 
-    p_classify = sub.add_parser(
-        "classify-items",
-        help="Tag transaction_items with a keyword-based category",
-    )
-    p_classify.add_argument(
-        "--refresh",
-        action="store_true",
-        help="Re-classify items that already have a category (default: only NULL)",
-    )
-    p_classify.set_defaults(func=cmd_classify_items)
+        p_classify = sub.add_parser(
+            "classify-items",
+            help="Tag transaction_items with a keyword-based category",
+        )
+        p_classify.add_argument(
+            "--refresh",
+            action="store_true",
+            help="Re-classify items that already have a category (default: only NULL)",
+        )
+        p_classify.set_defaults(func=cmd_classify_items)
 
-    p_classify_kind = sub.add_parser(
-        "classify-kind",
-        help="Tag transaction_items + transactions_v2 as material/labor",
-    )
-    p_classify_kind.add_argument(
-        "--refresh",
-        action="store_true",
-        help="Re-classify rows that already have a kind (default: only NULL)",
-    )
-    p_classify_kind.add_argument(
-        "--items-only",
-        action="store_true",
-        help="Classify line items only, skip whole-transaction pass",
-    )
-    p_classify_kind.add_argument(
-        "--txns-only",
-        action="store_true",
-        help="Classify whole transactions only, skip line items",
-    )
-    p_classify_kind.add_argument(
-        "--all-txns",
-        action="store_true",
-        help="Classify every unitemized txn, not just those inside a bundle",
-    )
-    p_classify_kind.set_defaults(func=cmd_classify_kind)
+        p_classify_kind = sub.add_parser(
+            "classify-kind",
+            help="Tag transaction_items + transactions_v2 as material/labor",
+        )
+        p_classify_kind.add_argument(
+            "--refresh",
+            action="store_true",
+            help="Re-classify rows that already have a kind (default: only NULL)",
+        )
+        p_classify_kind.add_argument(
+            "--items-only",
+            action="store_true",
+            help="Classify line items only, skip whole-transaction pass",
+        )
+        p_classify_kind.add_argument(
+            "--txns-only",
+            action="store_true",
+            help="Classify whole transactions only, skip line items",
+        )
+        p_classify_kind.add_argument(
+            "--all-txns",
+            action="store_true",
+            help="Classify every unitemized txn, not just those inside a bundle",
+        )
+        p_classify_kind.set_defaults(func=cmd_classify_kind)
 
-    p_merchants = sub.add_parser(
-        "classify-merchants",
-        help="Classify merchants by fetching their homepage and asking an LLM",
-    )
-    p_merchants.set_defaults(func=cmd_classify_merchants)
+        p_merchants = sub.add_parser(
+            "classify-merchants",
+            help="Classify merchants by fetching their homepage and asking an LLM",
+        )
+        p_merchants.set_defaults(func=cmd_classify_merchants)
 
-    p_shorten = sub.add_parser(
-        "shorten-items",
-        help="Use a local LLM to shorten long product titles into concise labels",
-    )
-    p_shorten.add_argument(
-        "--limit",
-        type=int,
-        default=500,
-        help="Max items to process in one run (default: 500)",
-    )
-    p_shorten.set_defaults(func=cmd_shorten_items)
+        p_shorten = sub.add_parser(
+            "shorten-items",
+            help="Use a local LLM to shorten long product titles into concise labels",
+        )
+        p_shorten.add_argument(
+            "--limit",
+            type=int,
+            default=500,
+            help="Max items to process in one run (default: 500)",
+        )
+        p_shorten.set_defaults(func=cmd_shorten_items)
 
-    p_aggregate = sub.add_parser(
-        "aggregate-categories",
-        help="Cluster fine-grained subcategories into broad canonical categories via LLM",
-    )
-    p_aggregate.set_defaults(func=cmd_aggregate_categories)
+        p_aggregate = sub.add_parser(
+            "aggregate-categories",
+            help="Cluster fine-grained subcategories into broad canonical categories via LLM",
+        )
+        p_aggregate.set_defaults(func=cmd_aggregate_categories)
 
     p_trips = sub.add_parser(
         "detect-trips",

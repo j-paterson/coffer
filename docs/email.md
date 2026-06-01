@@ -34,9 +34,9 @@ python3.12 -m venv .venv
 .venv/bin/pip install -e ./pipeline[email]
 ```
 
-The `[email]` group adds five packages that are not needed for the core pipeline:
+The `[email]` group adds four packages that are not needed for the core pipeline:
 `google-api-python-client`, `google-auth-oauthlib`, `google-auth-httplib2`,
-`beautifulsoup4`, and `pdfplumber`. Without them, `finance sync email` and
+and `beautifulsoup4`. Without them, `finance sync email` and
 `finance extract-email` will fail with a `ModuleNotFoundError` on import.
 
 ### Ollama running locally with NuExtract

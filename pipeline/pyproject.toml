@@ -18,7 +18,6 @@ email = [
   "google-auth-oauthlib>=1.2",
   "google-auth-httplib2>=0.2",
   "beautifulsoup4>=4.12",
-  "pdfplumber>=0.11",
 ]
 scrape = [
   "playwright>=1.40",
