@@ -78,10 +78,10 @@ class FetchStats:
 
 def _load_credentials() -> Credentials:
     if not GMAIL_CLIENT_SECRET.exists():
-        raise FileNotFoundError(
-            f"Missing OAuth client file: {GMAIL_CLIENT_SECRET}. "
-            "Create a Desktop OAuth client in Google Cloud Console, download "
-            "client_secret.json, and save it to that path."
+        raise SystemExit(
+            "Gmail OAuth client credential missing at .secrets/gmail_client.json. "
+            "Receipt extraction needs a Google Cloud OAuth client. "
+            "See docs/email.md for how to create one."
         )
 
     SECRETS_DIR.mkdir(parents=True, exist_ok=True)

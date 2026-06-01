@@ -11,7 +11,7 @@ never leaves your machine.
 - **Multi-source sync** — SimpleFIN (banks), Zerion/Alchemy (crypto wallets),
   Coinbase (exchange), DefiLlama/GeckoTerminal (prices)
 - **Net worth tracking** — daily time series with drill-down by account
-- **Spending breakdown** — rule-based categorization with receipt itemization
+- **Spending breakdown** — rule-based categorization, with optional [receipt itemization](docs/email.md) (requires Ollama + Gmail OAuth)
 - **Investment tracking** — holdings, cost basis, realized P&L
 - **Privacy mode** — blur all amounts for screen sharing
 
@@ -107,6 +107,12 @@ Useful sidecar commands:
 | `finance reconcile transfers` | Link transfer counterparties between accounts |
 | `finance backfill prices` | Fill missing daily prices for assets you hold |
 | `finance --help` | Full subcommand list |
+
+### Email receipt extraction (optional)
+
+For per-line-item spending breakdown from receipt emails, install with
+the `[email]` extras group and set up Ollama + a Gmail OAuth credential.
+See [docs/email.md](docs/email.md).
 
 ## Architecture
 

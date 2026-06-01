@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import email as stdlib_email
 import json
+import os
 import re
 import sqlite3
 import time
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -33,8 +35,8 @@ from . import senders
 from . import teamwork as teamwork_parser
 from . import venmo as venmo_parser
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "nuextract:3.8b"
+OLLAMA_URL = os.environ.get("COFFER_OLLAMA_URL", "http://localhost:11434/api/generate")
+MODEL = os.environ.get("COFFER_RECEIPT_MODEL", "nuextract:3.8b")
 
 # Template mirrors the Phase A validation template. Fields left blank by
 # NuExtract on a given receipt remain blank — that's the extractive contract.
@@ -220,8 +222,15 @@ def _call_nuextract(prompt: str, timeout: float = 180.0) -> tuple[str, float]:
         OLLAMA_URL, data=payload, headers={"Content-Type": "application/json"}
     )
     t0 = time.time()
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        data = json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.URLError as e:
+        raise SystemExit(
+            f"Could not reach Ollama at {OLLAMA_URL}. "
+            f"Receipt extraction needs a running Ollama server with the `{MODEL}` model. "
+            f"See docs/email.md for setup. Original error: {e}"
+        )
     return data.get("response", ""), time.time() - t0
 
 
