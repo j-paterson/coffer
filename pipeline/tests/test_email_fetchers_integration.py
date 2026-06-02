@@ -217,3 +217,84 @@ def test_imap_fetcher_populates_emails_table(email_db, monkeypatch, tmp_path):
     assert "shop@example.com" in row["from_addr"]
     assert row["subject"] == "Order Confirmation"
     assert row["extraction_status"] == "pending"
+
+
+# ---------------------------------------------------------------------------
+# extract_pending path-resolution: absolute raw_path (Manual/IMAP out-of-tree)
+# ---------------------------------------------------------------------------
+
+def test_extract_pending_resolves_absolute_raw_path(email_db, monkeypatch, tmp_path):
+    """extract_pending must reach .eml files stored at absolute paths.
+
+    When Manual/IMAP fetchers write to a directory outside PROJECT_ROOT the
+    DB row's raw_path is an absolute string.  PROJECT_ROOT / absolute_path
+    still resolves to the absolute path (Python Path semantics), so the file
+    should be found and processed — not marked as 'missing eml file'.
+    """
+    import finance_pipeline.emails.extract as extract_mod
+
+    # Write an .eml to an out-of-tree tmp directory (absolute path).
+    eml_dir = tmp_path / "out_of_tree"
+    eml_dir.mkdir()
+    eml_file = eml_dir / "receipt.eml"
+    eml_file.write_text(
+        "From: store@example.com\r\n"
+        "Subject: Your receipt\r\n"
+        "Date: Wed, 01 May 2026 12:00:00 +0000\r\n"
+        "\r\n"
+        "Thank you for your order. Total: $42.00"
+    )
+
+    # Insert a pending row whose raw_path is the absolute path string.
+    conn = sqlite3.connect(email_db)
+    conn.execute(
+        """INSERT INTO emails
+               (id, from_addr, subject, received_at, raw_path, extraction_status)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (
+            "manual-receipt-abs",
+            "store@example.com",
+            "Your receipt",
+            "2026-05-01T12:00:00+00:00",
+            str(eml_file),          # absolute path — the scenario under test
+            "pending",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    # Monkeypatch extract_mod.connect to use the test DB.
+    from contextlib import contextmanager
+    from typing import Iterator
+
+    @contextmanager
+    def _test_connect(db_path_arg=None) -> Iterator[sqlite3.Connection]:
+        c = sqlite3.connect(email_db)
+        c.execute("PRAGMA foreign_keys = ON")
+        c.row_factory = sqlite3.Row
+        try:
+            yield c
+            c.commit()
+        except Exception:
+            c.rollback()
+            raise
+        finally:
+            c.close()
+
+    monkeypatch.setattr(extract_mod, "connect", _test_connect)
+
+    # Use a no-op extractor so the test doesn't need Ollama running.
+    from finance_pipeline.emails.interfaces import ExtractedReceipt, ReceiptExtractor
+
+    class _NoOpExtractor(ReceiptExtractor):
+        def extract(self, content):
+            return ExtractedReceipt()
+
+    stats = extract_mod.extract_pending(extractor=_NoOpExtractor())
+
+    # The row must have been *processed* (not stuck as missing-eml).
+    assert stats.processed == 1, f"expected 1 processed, got {stats}"
+    assert stats.failed == 0, (
+        "row was marked failed — likely the absolute raw_path was not resolved; "
+        f"stats: {stats}"
+    )
