@@ -38,7 +38,7 @@ on first use).
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) v1.1+
+- [Bun](https://bun.sh) v1.3+
 - SQLite3
 - Python 3.12+ (optional — needed for the categorization + reconciliation
   sidecar and the file-based parsers in `pipeline/`)
