@@ -1,9 +1,12 @@
 name: simple_household
 description: |
-  A household with a checking account, savings account, and one credit
-  card. Used as the smoke-test fixture for both Python and TS loaders.
-  No crypto, no real-estate, no transfer-pair edge cases.
-as_of: "2026-04-27"
+  A household with a checking account, savings account, one credit
+  card, and a self-custody crypto wallet. Used as the smoke-test
+  fixture for both Python and TS loaders. Includes categorized
+  spending transactions (May+June 2026) and one ETH crypto position
+  with monthly snapshots (Jan 2025 - May 2026) so Spending and
+  Investments screenshots render with content.
+as_of: "2026-06-01"
 
 accounts:
   - id: simplefin:chk-1234
@@ -24,8 +27,15 @@ accounts:
     display_name: Chase Sapphire
     mode: live
     active: 1
+  - id: self-custody:eth-wallet
+    type: crypto
+    institution: Self-Custody
+    display_name: ETH Wallet
+    mode: manual
+    active: 1
 
 postings:
+  # Opening balances (2025-01-01)
   - txn:
       date: 2025-01-01
       description: opening balances
@@ -36,7 +46,159 @@ postings:
       - { account_id: simplefin:cc-9999,         amount:  -850.00 }
       - { account_id: equity:opening-balance,    amount: -15650.00 }
 
+  # ── May 2026 spending ───────────────────────────────────────────────────────
+  - txn: { date: 2026-05-01, description: Central Market, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:chk-1234,           amount:  -94.37 }
+      - { account_id: equity:unknown-counterparty,   amount:   94.37 }
+
+  - txn: { date: 2026-05-02, description: Coffee Bean & Co, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:   -7.25 }
+      - { account_id: equity:unknown-counterparty,   amount:    7.25 }
+
+  - txn: { date: 2026-05-03, description: Austin Energy, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:chk-1234,           amount: -118.40 }
+      - { account_id: equity:unknown-counterparty,   amount:  118.40 }
+
+  - txn: { date: 2026-05-04, description: Neighborhood Grocery Co, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:chk-1234,           amount:  -73.19 }
+      - { account_id: equity:unknown-counterparty,   amount:   73.19 }
+
+  - txn: { date: 2026-05-05, description: Shell Gas Station, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:  -58.60 }
+      - { account_id: equity:unknown-counterparty,   amount:   58.60 }
+
+  - txn: { date: 2026-05-06, description: Netflix, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:  -15.99 }
+      - { account_id: equity:unknown-counterparty,   amount:   15.99 }
+
+  - txn: { date: 2026-05-07, description: Hill Country Diner, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:  -42.80 }
+      - { account_id: equity:unknown-counterparty,   amount:   42.80 }
+
+  - txn: { date: 2026-05-08, description: Sunrise Pharmacy, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:chk-1234,           amount:  -34.50 }
+      - { account_id: equity:unknown-counterparty,   amount:   34.50 }
+
+  - txn: { date: 2026-05-09, description: Morning Roast Cafe, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:   -5.75 }
+      - { account_id: equity:unknown-counterparty,   amount:    5.75 }
+
+  - txn: { date: 2026-05-10, description: Spicewood Market, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:chk-1234,           amount:  -87.92 }
+      - { account_id: equity:unknown-counterparty,   amount:   87.92 }
+
+  - txn: { date: 2026-05-11, description: Frontier Internet, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:chk-1234,           amount:  -79.99 }
+      - { account_id: equity:unknown-counterparty,   amount:   79.99 }
+
+  - txn: { date: 2026-05-12, description: Keep Austin Fit Gym, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:  -45.00 }
+      - { account_id: equity:unknown-counterparty,   amount:   45.00 }
+
+  - txn: { date: 2026-05-13, description: Lakeside Cinema, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:  -28.50 }
+      - { account_id: equity:unknown-counterparty,   amount:   28.50 }
+
+  - txn: { date: 2026-05-14, description: HEB Grocery, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:chk-1234,           amount: -112.64 }
+      - { account_id: equity:unknown-counterparty,   amount:  112.64 }
+
+  - txn: { date: 2026-05-15, description: Adobe Creative Cloud, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:  -54.99 }
+      - { account_id: equity:unknown-counterparty,   amount:   54.99 }
+
+  - txn: { date: 2026-05-16, description: Texaco Gas, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:  -62.30 }
+      - { account_id: equity:unknown-counterparty,   amount:   62.30 }
+
+  - txn: { date: 2026-05-17, description: Barton Springs Tacos, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:  -18.45 }
+      - { account_id: equity:unknown-counterparty,   amount:   18.45 }
+
+  - txn: { date: 2026-05-18, description: Whole Foods Market, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:chk-1234,           amount:  -96.80 }
+      - { account_id: equity:unknown-counterparty,   amount:   96.80 }
+
+  - txn: { date: 2026-05-19, description: City of Austin Water, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:chk-1234,           amount:  -47.22 }
+      - { account_id: equity:unknown-counterparty,   amount:   47.22 }
+
+  - txn: { date: 2026-05-21, description: Domain Apparel, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:  -89.95 }
+      - { account_id: equity:unknown-counterparty,   amount:   89.95 }
+
+  - txn: { date: 2026-05-22, description: Brew Culture Coffee, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:   -6.00 }
+      - { account_id: equity:unknown-counterparty,   amount:    6.00 }
+
+  - txn: { date: 2026-05-23, description: Randalls Grocery, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:chk-1234,           amount:  -65.48 }
+      - { account_id: equity:unknown-counterparty,   amount:   65.48 }
+
+  - txn: { date: 2026-05-25, description: Spotify, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:   -9.99 }
+      - { account_id: equity:unknown-counterparty,   amount:    9.99 }
+
+  - txn: { date: 2026-05-26, description: South Congress Sushi, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:  -55.20 }
+      - { account_id: equity:unknown-counterparty,   amount:   55.20 }
+
+  - txn: { date: 2026-05-28, description: Travis County Health Clinic, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:chk-1234,           amount:  -20.00 }
+      - { account_id: equity:unknown-counterparty,   amount:   20.00 }
+
+  # ── June 2026 spending ──────────────────────────────────────────────────────
+  - txn: { date: 2026-06-01, description: Costco Wholesale, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:chk-1234,           amount: -138.72 }
+      - { account_id: equity:unknown-counterparty,   amount:  138.72 }
+
+  - txn: { date: 2026-06-01, description: Dragonfly Coffee, derived_by: ingest }
+    legs:
+      - { account_id: simplefin:cc-9999,             amount:   -8.50 }
+      - { account_id: equity:unknown-counterparty,   amount:    8.50 }
+
 balance_assertions:
   - { account_id: simplefin:chk-1234, as_of: 2026-04-17, expected_usd:  5234.00, source: simplefin, source_file: feed }
   - { account_id: simplefin:sav-5678, as_of: 2026-04-17, expected_usd: 12450.00, source: simplefin, source_file: feed }
   - { account_id: simplefin:cc-9999,  as_of: 2026-04-17, expected_usd:  -742.00, source: simplefin, source_file: feed }
+
+positions:
+  - account_id: self-custody:eth-wallet
+    chain: ethereum
+    contract_address: ""
+    symbol: ETH
+    asset_class: crypto
+
+position_snapshots:
+  - { position_id: 1, as_of: "2025-01-01", source: zerion, value_usd: 8500.00 }
+  - { position_id: 1, as_of: "2025-04-01", source: zerion, value_usd: 9200.00 }
+  - { position_id: 1, as_of: "2025-07-01", source: zerion, value_usd: 7800.00 }
+  - { position_id: 1, as_of: "2025-10-01", source: zerion, value_usd: 10500.00 }
+  - { position_id: 1, as_of: "2026-02-01", source: zerion, value_usd: 12300.00 }
+  - { position_id: 1, as_of: "2026-05-01", source: zerion, value_usd: 11400.00 }
