@@ -61,6 +61,8 @@ def get_fetcher() -> EmailFetcher:
         return GmailFetcher(
             max_results=fetcher_cfg.get("max_results"),
             query=fetcher_cfg.get("query"),
+            client_secret_path=fetcher_cfg.get("client_secret_path"),
+            token_cache_path=fetcher_cfg.get("token_cache_path"),
         )
     if backend == "imap":
         try:

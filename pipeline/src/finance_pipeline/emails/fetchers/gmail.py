@@ -71,10 +71,13 @@ class FetchStats:
         }
 
 
-def _load_credentials() -> Credentials:
-    if not GMAIL_CLIENT_SECRET.exists():
+def _load_credentials(
+    client_secret_path: Path = GMAIL_CLIENT_SECRET,
+    token_cache_path: Path = GMAIL_TOKEN,
+) -> Credentials:
+    if not client_secret_path.exists():
         raise SystemExit(
-            "Gmail OAuth client credential missing at .secrets/gmail_client.json. "
+            f"Gmail OAuth client credential missing at {client_secret_path}. "
             "Receipt extraction needs a Google Cloud OAuth client. "
             "See docs/email.md for how to create one."
         )
@@ -82,8 +85,8 @@ def _load_credentials() -> Credentials:
     SECRETS_DIR.mkdir(parents=True, exist_ok=True)
 
     creds: Credentials | None = None
-    if GMAIL_TOKEN.exists():
-        creds = Credentials.from_authorized_user_file(str(GMAIL_TOKEN), SCOPES)
+    if token_cache_path.exists():
+        creds = Credentials.from_authorized_user_file(str(token_cache_path), SCOPES)
 
     if creds and creds.valid:
         return creds
@@ -92,12 +95,12 @@ def _load_credentials() -> Credentials:
         creds.refresh(Request())
     else:
         flow = InstalledAppFlow.from_client_secrets_file(
-            str(GMAIL_CLIENT_SECRET), SCOPES
+            str(client_secret_path), SCOPES
         )
         creds = _run_oauth_flow(flow)
 
-    GMAIL_TOKEN.write_text(creds.to_json())
-    GMAIL_TOKEN.chmod(0o600)
+    token_cache_path.write_text(creds.to_json())
+    token_cache_path.chmod(0o600)
     return creds
 
 
@@ -203,8 +206,16 @@ def _run_oauth_flow(flow: InstalledAppFlow, port: int = 8765) -> Credentials:
     return flow.credentials
 
 
-def _gmail_service():
-    return build("gmail", "v1", credentials=_load_credentials(), cache_discovery=False)
+def _gmail_service(
+    client_secret_path: Path = GMAIL_CLIENT_SECRET,
+    token_cache_path: Path = GMAIL_TOKEN,
+):
+    return build(
+        "gmail",
+        "v1",
+        credentials=_load_credentials(client_secret_path, token_cache_path),
+        cache_discovery=False,
+    )
 
 
 def _parse_internal_date(ms: str) -> datetime:
@@ -278,15 +289,27 @@ class GmailFetcher(EmailFetcher):
     via the emails DB table's extraction_status column, which extract.py owns.
     """
 
-    def __init__(self, max_results: int | None = None, query: str | None = None) -> None:
+    def __init__(
+        self,
+        max_results: int | None = None,
+        query: str | None = None,
+        client_secret_path: str | None = None,
+        token_cache_path: str | None = None,
+    ) -> None:
         self.max_results = max_results if max_results is not None else 100
         self.query = query if query is not None else DEFAULT_QUERY
+        self.client_secret_path = (
+            Path(client_secret_path) if client_secret_path is not None else GMAIL_CLIENT_SECRET
+        )
+        self.token_cache_path = (
+            Path(token_cache_path) if token_cache_path is not None else GMAIL_TOKEN
+        )
         self.stats: FetchStats = FetchStats()
 
     def fetch_new(self) -> Iterator[Path]:
         """Run the Gmail sync and yield .eml paths for every newly-fetched message."""
         self.stats = FetchStats()
-        service = _gmail_service()
+        service = _gmail_service(self.client_secret_path, self.token_cache_path)
 
         try:
             resp = (

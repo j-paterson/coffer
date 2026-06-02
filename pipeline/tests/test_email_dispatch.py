@@ -129,3 +129,22 @@ def test_openai_dispatch(with_config, monkeypatch):
     extractor = dispatch.get_extractor()
     assert extractor.__class__.__name__ == "OpenAIExtractor"
     assert extractor.model == "gpt-4o-mini"
+
+
+def test_gmail_dispatch_with_custom_credential_paths(with_config, tmp_path):
+    """Custom credential paths from finance.config.ts thread through to GmailFetcher."""
+    custom_cred = tmp_path / "my_creds.json"
+    custom_token = tmp_path / "my_token.json"
+    with_config.write_text(json.dumps({
+        "fetcher": {
+            "backend": "gmail",
+            "client_secret_path": str(custom_cred),
+            "token_cache_path": str(custom_token),
+        },
+        "extractor": {"backend": "ollama"},
+    }))
+    fetcher = dispatch.get_fetcher()
+    assert fetcher.__class__.__name__ == "GmailFetcher"
+    # The fetcher stores the configured paths
+    assert str(fetcher.client_secret_path) == str(custom_cred)
+    assert str(fetcher.token_cache_path) == str(custom_token)
