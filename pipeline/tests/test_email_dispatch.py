@@ -113,3 +113,19 @@ def test_anthropic_dispatch(with_config, monkeypatch):
     extractor = dispatch.get_extractor()
     assert extractor.__class__.__name__ == "AnthropicExtractor"
     assert extractor.model == "claude-haiku-4-5-20251001"
+
+
+def test_openai_dispatch(with_config, monkeypatch):
+    """dispatch returns an OpenAIExtractor when configured."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    with_config.write_text(json.dumps({
+        "fetcher": {"backend": "gmail"},
+        "extractor": {
+            "backend": "openai",
+            "api_key_env": "OPENAI_API_KEY",
+            "model": "gpt-4o-mini",
+        },
+    }))
+    extractor = dispatch.get_extractor()
+    assert extractor.__class__.__name__ == "OpenAIExtractor"
+    assert extractor.model == "gpt-4o-mini"
