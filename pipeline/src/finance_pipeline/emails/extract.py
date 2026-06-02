@@ -39,7 +39,7 @@ from .extractors.ollama import (
     _squeeze_whitespace,
     MODEL,
 )
-from .interfaces import ExtractedReceipt, ReceiptExtractor
+from .interfaces import EmailContent, ExtractedReceipt, ReceiptExtractor
 from .sender_parsers import try_sender_parsers
 
 
@@ -456,13 +456,13 @@ def extract_pending(
 
             # LLM extractor fallback (NuExtract via Ollama by default).
             try:
-                receipt = extractor.extract(
-                    eml_path,
+                email_content = EmailContent(
+                    eml_path=eml_path,
+                    body_text=body.text,
                     from_addr=body.from_addr,
                     subject=body.subject,
-                    body_text=body.text,
-                    candidate=candidate,
                 )
+                receipt = extractor.extract(email_content)
                 stats.nuextract_calls += 1
             except SystemExit:
                 raise  # friendly Ollama-unreachable error — propagate

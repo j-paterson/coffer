@@ -22,7 +22,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 
-from ..interfaces import ExtractedReceipt, ReceiptExtractor
+from ..interfaces import EmailContent, ExtractedReceipt, ReceiptExtractor
 
 OLLAMA_URL = os.environ.get("COFFER_OLLAMA_URL", "http://localhost:11434/api/generate")
 MODEL = os.environ.get("COFFER_RECEIPT_MODEL", "nuextract:3.8b")
@@ -165,22 +165,16 @@ def _parse_date(raw: str | None) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def _build_prompt(from_addr: str, subject: str, text: str, matched_amount: float | None = None) -> str:
+def _build_prompt(from_addr: str, subject: str, text: str) -> str:
     tmpl = json.dumps(TEMPLATE, indent=2)
-    parts = [f"From: {from_addr}", f"Subject: {subject}"]
-    if matched_amount is not None:
-        parts.append(f"Total paid: ${matched_amount:.2f}")
-    preamble = "\n".join(parts) + "\n\n"
+    preamble = f"From: {from_addr}\nSubject: {subject}\n\n"
     body = (preamble + text)[:12000]
     return f"<|input|>\n### Template:\n{tmpl}\n### Text:\n{body}\n<|output|>\n"
 
 
-def _build_items_prompt(from_addr: str, subject: str, text: str, matched_amount: float | None = None) -> str:
+def _build_items_prompt(from_addr: str, subject: str, text: str) -> str:
     tmpl = json.dumps(ITEMS_TEMPLATE, indent=2)
-    parts = [f"From: {from_addr}", f"Subject: {subject}"]
-    if matched_amount is not None:
-        parts.append(f"Total paid: ${matched_amount:.2f}")
-    preamble = "\n".join(parts) + "\n\n"
+    preamble = f"From: {from_addr}\nSubject: {subject}\n\n"
     body = (preamble + text)[:12000]
     return f"<|input|>\n### Template:\n{tmpl}\n### Text:\n{body}\n<|output|>\n"
 
@@ -208,12 +202,9 @@ def _looks_itemized(text: str) -> bool:
 class OllamaExtractor(ReceiptExtractor):
     """Receipt extractor backed by Ollama-served NuExtract.
 
-    Implements the ReceiptExtractor interface. The .extract() method reads
-    the .eml file, calls the Ollama API, and returns an ExtractedReceipt.
-
-    Extra keyword arguments (from_addr, subject, body_text, candidate) let
-    the extraction loop pass context it has already computed, avoiding
-    redundant parsing. If omitted, extract() reads and parses the eml itself.
+    Implements the ReceiptExtractor interface. The .extract() method takes
+    an EmailContent with pre-parsed fields, calls the Ollama API, and returns
+    an ExtractedReceipt.
     """
 
     def __init__(self, url: str = OLLAMA_URL, model: str = MODEL) -> None:
@@ -224,27 +215,22 @@ class OllamaExtractor(ReceiptExtractor):
     # ReceiptExtractor interface
     # ------------------------------------------------------------------
 
-    def extract(
-        self,
-        eml_path: Path,
-        *,
-        from_addr: str = "",
-        subject: str = "",
-        body_text: str = "",
-        candidate: float | None = None,
-    ) -> ExtractedReceipt:
-        """Read the .eml (or use pre-parsed context) and run NuExtract.
+    def extract(self, content: EmailContent) -> ExtractedReceipt:
+        """Run NuExtract on the pre-parsed email content.
 
         Returns an ExtractedReceipt. Blank fields stay blank — extractive
         contract. Raises SystemExit if Ollama is unreachable (friendly error).
         """
+        from_addr = content.from_addr
+        subject = content.subject
+        body_text = content.body_text
         if not body_text:
-            body = _parse_eml_body(eml_path)
+            body = _parse_eml_body(content.eml_path)
             from_addr = body.from_addr
             subject = body.subject
             body_text = body.text
 
-        prompt = _build_prompt(from_addr, subject, body_text, candidate)
+        prompt = _build_prompt(from_addr, subject, body_text)
         raw, elapsed = self._call(prompt)
         cleaned = raw.replace("<|end-output|>", "").strip()
 
@@ -268,7 +254,7 @@ class OllamaExtractor(ReceiptExtractor):
         if items_empty and _looks_itemized(body_text):
             try:
                 raw2, _ = self._call(
-                    _build_items_prompt(from_addr, subject, body_text, candidate)
+                    _build_items_prompt(from_addr, subject, body_text)
                 )
                 cleaned2 = raw2.replace("<|end-output|>", "").strip()
                 parsed2 = json.loads(cleaned2)

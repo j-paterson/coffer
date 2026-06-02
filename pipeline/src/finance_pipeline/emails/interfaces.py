@@ -33,6 +33,14 @@ class ExtractedReceipt:
     items: list[dict[str, object]] = field(default_factory=list)
 
 
+@dataclass
+class EmailContent:
+    eml_path: Path
+    body_text: str
+    from_addr: str
+    subject: str
+
+
 class EmailFetcher(ABC):
     """Yields .eml file paths the system hasn't processed yet."""
 
@@ -49,5 +57,5 @@ class ReceiptExtractor(ABC):
     """Parses an .eml file into structured receipt fields."""
 
     @abstractmethod
-    def extract(self, eml_path: Path) -> ExtractedReceipt:
-        """Read the .eml, return an ExtractedReceipt. Blank fields stay blank."""
+    def extract(self, content: EmailContent) -> ExtractedReceipt:
+        """Read the email content, return an ExtractedReceipt. Blank fields stay blank."""
