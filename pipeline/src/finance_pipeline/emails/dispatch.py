@@ -33,13 +33,22 @@ def _config_path() -> Path:
 def _load_config() -> dict[str, Any]:
     """Load the cached email config, or return the default."""
     path = _config_path()
+    DEFAULTS = {
+        "fetcher": {"backend": "gmail"},
+        "extractor": {"backend": "ollama"},
+    }
     if not path.exists():
-        return {
-            "fetcher": {"backend": "gmail"},
-            "extractor": {"backend": "ollama"},
-        }
-    with path.open() as f:
-        return json.load(f)
+        return DEFAULTS
+    try:
+        with path.open() as f:
+            return json.load(f)
+    except json.JSONDecodeError as e:
+        import sys
+        print(
+            f"[email] config cache at {path} is malformed ({e}); using defaults",
+            file=sys.stderr,
+        )
+        return DEFAULTS
 
 
 def get_fetcher() -> EmailFetcher:

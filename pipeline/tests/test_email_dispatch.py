@@ -67,3 +67,12 @@ def test_unimplemented_backends_raise_friendly_error(with_config):
     }))
     with pytest.raises(dispatch.BackendUnavailableError, match="lands in B2.1"):
         dispatch.get_fetcher()
+
+
+def test_malformed_config_falls_back_to_defaults(with_config, capsys):
+    """A malformed JSON cache file logs a warning and uses defaults."""
+    with_config.write_text("{ this is not valid json")
+    fetcher = dispatch.get_fetcher()
+    assert fetcher.__class__.__name__ == "GmailFetcher"
+    err = capsys.readouterr().err
+    assert "malformed" in err
