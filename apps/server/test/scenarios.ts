@@ -130,16 +130,27 @@ export function loadScenarioText(
   if (Array.isArray(doc.postings)) {
     const txnCols = columnsOf(db, "transactions_v2");
     const postCols = columnsOf(db, "postings");
-    (doc.postings as Array<{ txn: Record<string, unknown>; legs: Array<Record<string, unknown>> }>)
+    const itemCols = columnsOf(db, "transaction_items");
+    (doc.postings as Array<{ txn: Record<string, unknown>; legs: Array<Record<string, unknown>>; items?: Array<Record<string, unknown>> }>)
       .forEach((p, i) => {
         const txnId = insertRow(db, "transactions_v2", p.txn, txnCols, fixturePath, i);
+        const txnIdNum = typeof txnId === "bigint" ? Number(txnId) : txnId;
         p.legs.forEach((leg, j) => {
           insertRow(
             db, "postings",
-            { ...leg, txn_id: typeof txnId === "bigint" ? Number(txnId) : txnId },
+            { ...leg, txn_id: txnIdNum },
             postCols, fixturePath, `${i}/${j}`,
           );
         });
+        if (Array.isArray(p.items)) {
+          p.items.forEach((item, k) => {
+            insertRow(
+              db, "transaction_items",
+              { ...item, transaction_v2_id: txnIdNum },
+              itemCols, fixturePath, `${i}/item${k}`,
+            );
+          });
+        }
       });
   }
 

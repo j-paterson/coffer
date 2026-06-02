@@ -163,12 +163,17 @@ def load_scenario_text(
     if "postings" in doc:
         txn_cols = _columns(conn, "transactions_v2")
         post_cols = _columns(conn, "postings")
+        item_cols = _columns(conn, "transaction_items")
         for i, p in enumerate(doc["postings"]):
             txn_id = _insert_row(conn, "transactions_v2", dict(p["txn"]), txn_cols, fixture_path, i)
             for j, leg in enumerate(p["legs"]):
                 row = dict(leg)
                 row["txn_id"] = txn_id
                 _insert_row(conn, "postings", row, post_cols, fixture_path, f"{i}/{j}")
+            for k, item in enumerate(p.get("items") or []):
+                row = dict(item)
+                row["transaction_v2_id"] = txn_id
+                _insert_row(conn, "transaction_items", row, item_cols, fixture_path, f"{i}/item{k}")
 
     if "balance_assertions" in doc:
         cols = _columns(conn, "balance_assertions")

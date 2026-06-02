@@ -166,7 +166,24 @@ async function main(): Promise<void> {
 
     console.log("[screenshots] Capturing pages...");
     await capture(page, "/", "networth.png");
-    await capture(page, "/spending", "spending.png");
+
+    // Spending: navigate, then widen range to 90 days so May transactions show.
+    console.log(`  Navigating to ${WEB_BASE}/spending ...`);
+    await page.goto(`${WEB_BASE}/spending`, { waitUntil: "load", timeout: 45_000 });
+    await page.waitForSelector("aside nav", { timeout: 15_000 });
+    await page.waitForTimeout(800);
+    // Click the "90 days" range button
+    const btn90 = page.getByRole("button", { name: "90 days" });
+    if (await btn90.isVisible()) {
+      await btn90.click();
+      await page.waitForTimeout(800);
+    }
+    {
+      const out = resolve(SCREENSHOTS_DIR, "spending.png");
+      await page.screenshot({ path: out, fullPage: false });
+      console.log(`    Wrote ${out}`);
+    }
+
     await capture(page, "/investments", "investments.png");
 
     console.log("[screenshots] Done.");

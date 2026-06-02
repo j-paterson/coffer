@@ -51,6 +51,14 @@
               "required": ["account_id", "amount"],
               "additionalProperties": true
             }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "line_no"],
+              "additionalProperties": true
+            }
           }
         }
       }
