@@ -97,3 +97,19 @@ def test_malformed_config_falls_back_to_defaults(with_config, capsys):
     assert fetcher.__class__.__name__ == "GmailFetcher"
     err = capsys.readouterr().err
     assert "malformed" in err
+
+
+def test_anthropic_dispatch(with_config, monkeypatch):
+    """dispatch returns an AnthropicExtractor when configured."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    with_config.write_text(json.dumps({
+        "fetcher": {"backend": "gmail"},
+        "extractor": {
+            "backend": "anthropic",
+            "api_key_env": "ANTHROPIC_API_KEY",
+            "model": "claude-haiku-4-5-20251001",
+        },
+    }))
+    extractor = dispatch.get_extractor()
+    assert extractor.__class__.__name__ == "AnthropicExtractor"
+    assert extractor.model == "claude-haiku-4-5-20251001"
