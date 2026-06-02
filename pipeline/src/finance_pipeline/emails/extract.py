@@ -1,11 +1,13 @@
-"""NuExtract-powered receipt extractor for milestone 8b.
+"""Receipt extraction orchestrator for milestone 8b.
 
 Drains the `emails` table's `extraction_status='pending'` queue:
 
   1. Parse the cached .eml file and pull out a plain-text body.
-  2. Feed the body to NuExtract (Ollama HTTP API) with a receipt template.
-  3. Normalize the extracted fields (parse amounts, parse dates).
-  4. Update the email row and insert any line items into transaction_items.
+  2. Apply the sender-specific first-pass tier (amazon, venmo, teamwork).
+  3. Fall through to the configured ReceiptExtractor backend (NuExtract via
+     Ollama by default) for unmatched senders.
+  4. Normalize the extracted fields (parse amounts, parse dates).
+  5. Update the email row and insert any line items into transaction_items.
 
 Absolutely no hallucination path: NuExtract is extractive by construction.
 Fields NuExtract leaves blank stay blank in the DB.
@@ -14,12 +16,8 @@ from __future__ import annotations
 
 import email as stdlib_email
 import json
-import os
 import re
 import sqlite3
-import time
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
@@ -30,34 +28,19 @@ from bs4 import BeautifulSoup
 
 from ..config import PROJECT_ROOT
 from ..db import connect
-from . import amazon as amazon_parser
 from . import senders
-from . import teamwork as teamwork_parser
 from . import venmo as venmo_parser
-
-OLLAMA_URL = os.environ.get("COFFER_OLLAMA_URL", "http://localhost:11434/api/generate")
-MODEL = os.environ.get("COFFER_RECEIPT_MODEL", "nuextract:3.8b")
-
-# Template mirrors the Phase A validation template. Fields left blank by
-# NuExtract on a given receipt remain blank — that's the extractive contract.
-TEMPLATE: dict = {
-    "merchant": "",
-    "date": "",
-    "currency": "",
-    "subtotal": "",
-    "tax": "",
-    "total": "",
-    "payment_method": "",
-    "order_id": "",
-    "items": [
-        {
-            "name": "",
-            "quantity": "",
-            "unit_price": "",
-            "line_total": "",
-        }
-    ],
-}
+from .extractors.ollama import (
+    OllamaExtractor,
+    _html_to_text,
+    _parse_amount,
+    _parse_date,
+    _parse_int,
+    _squeeze_whitespace,
+    MODEL,
+)
+from .interfaces import ExtractedReceipt, ReceiptExtractor
+from .sender_parsers import try_sender_parsers
 
 
 @dataclass
@@ -124,204 +107,6 @@ def _parse_eml(path: Path) -> EmailBody:
     return EmailBody(from_addr, subject, _squeeze_whitespace(content))
 
 
-def _html_to_text(html: str) -> str:
-    soup = BeautifulSoup(html, "html.parser")
-    # Drop noise tags that confuse the extractor.
-    for tag in soup(["script", "style", "noscript", "head", "meta", "link"]):
-        tag.decompose()
-    # Table-aware pass: flatten LEAF tables (tables with no nested <table>
-    # children) to pipe-separated rows so cell boundaries survive for
-    # NuExtract. Must run BEFORE the generic block-tag newline injection.
-    #
-    # Using only leaf tables avoids the quadratic text explosion that occurs
-    # when processing outer layout tables in deeply-nested layouts (e.g. Square
-    # and Lyft emails can have 25–127 nested tables where each outer-table row
-    # includes the entire email content). Leaf tables are the innermost data
-    # tables; their pipe-separated text is embedded into parent cells and then
-    # picked up naturally by the block-tag get_text() pass below.
-    for table in soup.find_all("table"):
-        if table.find("table"):
-            continue  # not a leaf — skip; inner tables will be handled first
-        rows: list[str] = []
-        for tr in table.find_all("tr"):
-            cells = [td.get_text(" ", strip=True) for td in tr.find_all(["td", "th"])]
-            if any(c for c in cells):
-                rows.append(" | ".join(cells))
-        if rows:
-            table.replace_with("\n\n" + "\n".join(rows) + "\n\n")
-    # Inject newlines around block elements so layout survives .get_text().
-    # Keep tr/td here so any non-leaf parent tables (still in the DOM after
-    # their leaf children were replaced with text) render with line breaks.
-    for br in soup.find_all("br"):
-        br.replace_with("\n")
-    for tag in soup.find_all(["p", "div", "tr", "td", "li", "h1", "h2", "h3"]):
-        tag.append("\n")
-    return soup.get_text()
-
-
-_WS_RE = re.compile(r"[ \t]+")
-_BLANK_RE = re.compile(r"\n\s*\n+")
-
-
-def _squeeze_whitespace(text: str) -> str:
-    text = _WS_RE.sub(" ", text)
-    text = _BLANK_RE.sub("\n\n", text)
-    return text.strip()
-
-
-# --- NuExtract call ---------------------------------------------------------
-
-
-def _build_prompt(body: EmailBody, matched_amount: float | None = None) -> str:
-    tmpl = json.dumps(TEMPLATE, indent=2)
-    # Prepend From/Subject/Total so NuExtract anchors on the sender and the
-    # known total. NuExtract is extractive — adding these lines to the text
-    # lets it use them as normal extractable tokens (it can't invent them).
-    parts = [f"From: {body.from_addr}", f"Subject: {body.subject}"]
-    if matched_amount is not None:
-        parts.append(f"Total paid: ${matched_amount:.2f}")
-    preamble = "\n".join(parts) + "\n\n"
-    text = (preamble + body.text)[:12000]
-    return f"<|input|>\n### Template:\n{tmpl}\n### Text:\n{text}\n<|output|>\n"
-
-
-# Narrower template used by the retry pass when the main extraction comes
-# back with an empty items array on a body that clearly has itemized content.
-ITEMS_TEMPLATE: dict = {
-    "items": [
-        {
-            "name": "",
-            "quantity": "",
-            "unit_price": "",
-            "line_total": "",
-        }
-    ],
-}
-
-
-def _build_items_prompt(body: EmailBody, matched_amount: float | None = None) -> str:
-    tmpl = json.dumps(ITEMS_TEMPLATE, indent=2)
-    parts = [f"From: {body.from_addr}", f"Subject: {body.subject}"]
-    if matched_amount is not None:
-        parts.append(f"Total paid: ${matched_amount:.2f}")
-    preamble = "\n".join(parts) + "\n\n"
-    text = (preamble + body.text)[:12000]
-    return f"<|input|>\n### Template:\n{tmpl}\n### Text:\n{text}\n<|output|>\n"
-
-
-def _call_nuextract(prompt: str, timeout: float = 180.0) -> tuple[str, float]:
-    payload = json.dumps(
-        {
-            "model": MODEL,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": 0},
-        }
-    ).encode("utf-8")
-    req = urllib.request.Request(
-        OLLAMA_URL, data=payload, headers={"Content-Type": "application/json"}
-    )
-    t0 = time.time()
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read())
-    except urllib.error.URLError as e:
-        raise SystemExit(
-            f"Could not reach Ollama at {OLLAMA_URL}. "
-            f"Receipt extraction needs a running Ollama server with the `{MODEL}` model. "
-            f"See docs/email.md for setup. Original error: {e}"
-        )
-    return data.get("response", ""), time.time() - t0
-
-
-def _clean_output(raw: str) -> str:
-    return raw.replace("<|end-output|>", "").strip()
-
-
-# --- field normalization ----------------------------------------------------
-
-
-# Matches a single dollar amount; anchored to stop at the number so trailing
-# "/month" or "USD" or parenthetical notes don't bleed into the capture. The
-# comma-grouped branch requires at least one comma so plain "7800" doesn't
-# truncate to "780".
-_AMOUNT_RE = re.compile(
-    r"-?\$?\s*(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)"
-)
-_DATE_FORMATS = [
-    "%Y-%m-%d",
-    "%b %d %Y",
-    "%B %d %Y",
-    "%d %b %Y",
-    "%d %B %Y",
-    "%m/%d/%Y",
-    "%m/%d/%y",
-]
-
-
-def _parse_amount(raw: str | None) -> float | None:
-    if not raw:
-        return None
-    m = _AMOUNT_RE.search(raw)
-    if not m:
-        return None
-    try:
-        return float(m.group(1).replace(",", ""))
-    except ValueError:
-        return None
-
-
-def _parse_int(raw: str | None) -> float | None:
-    if not raw:
-        return None
-    m = re.search(r"\d+(?:\.\d+)?", raw)
-    return float(m.group(0)) if m else None
-
-
-_DATE_MONTH_FIRST_RE = re.compile(r"([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})")
-_DATE_DAY_FIRST_RE = re.compile(r"\b(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\b")
-
-
-def _parse_date(raw: str | None) -> str | None:
-    """Pull an ISO date from messy NuExtract output.
-
-    Handles "Apr 5, 2026, 6:11:40 PM" and "Wed, 04 Mar 2026 13:28:43 +0000"
-    and "April 10, 2026" by first hunting for a "MonthName Day Year" anchor,
-    then falling back to known strptime formats.
-    """
-    if not raw:
-        return None
-    # Month-first: "Apr 5, 2026, 6:11:40 PM" / "April 10, 2026"
-    m = _DATE_MONTH_FIRST_RE.search(raw)
-    if m:
-        candidate = f"{m.group(1)} {m.group(2)} {m.group(3)}"
-        for fmt in ("%b %d %Y", "%B %d %Y"):
-            try:
-                return datetime.strptime(candidate, fmt).strftime("%Y-%m-%d")
-            except ValueError:
-                continue
-    # Day-first: "Wed, 4 Mar 2026 13:28:43 +0000"
-    m = _DATE_DAY_FIRST_RE.search(raw)
-    if m:
-        candidate = f"{m.group(1)} {m.group(2)} {m.group(3)}"
-        for fmt in ("%d %b %Y", "%d %B %Y"):
-            try:
-                return datetime.strptime(candidate, fmt).strftime("%Y-%m-%d")
-            except ValueError:
-                continue
-    # Already-ISO date anywhere in the string.
-    m2 = re.search(r"\b(\d{4})-(\d{2})-(\d{2})\b", raw)
-    if m2:
-        return m2.group(0)
-    # Third: numeric formats like 4/10/2026
-    for fmt in ("%m/%d/%Y", "%m/%d/%y"):
-        try:
-            return datetime.strptime(raw.strip(), fmt).strftime("%Y-%m-%d")
-        except ValueError:
-            continue
-    return None
-
-
 # --- DB I/O -----------------------------------------------------------------
 
 
@@ -368,19 +153,12 @@ def _mark_skipped(conn: sqlite3.Connection, email_id: str, reason: str) -> None:
 
 # ---------- match-first prefilter -----------------------------------------
 
-# Dollar amount regexes. We accept two forms:
-#   1. $-prefixed: "$34.94", "$1,234.56" — the dominant US format
-#   2. USD-suffixed: "80.06 USD" — used by Amazon and a few others that
-#      strip currency symbols from their plaintext
-# Both require at least one decimal digit so we don't catch order IDs.
 _BODY_DOLLAR_RE = re.compile(r"\$\s*(\d{1,3}(?:,\d{3})*\.\d{2}|\d+\.\d{2})")
 _BODY_USD_RE = re.compile(
     r"(\d{1,3}(?:,\d{3})*\.\d{1,2}|\d+\.\d{1,2})\s*USD\b",
     re.IGNORECASE,
 )
 
-# Tolerances mirror the strict-pass matcher in emails/match.py but with a
-# wider date window because snippets don't always reflect the exact txn day.
 PREFILTER_AMOUNT_DELTA = 0.05
 PREFILTER_DATE_WINDOW = 7
 
@@ -393,8 +171,6 @@ def _extract_amounts(text: str) -> set[float]:
                 amounts.add(float(m.group(1).replace(",", "")))
             except ValueError:
                 continue
-    # Drop the $0.00 placeholder — it will match freebies but not the kind
-    # of thing we're trying to enrich.
     amounts.discard(0.0)
     return amounts
 
@@ -409,7 +185,7 @@ def _has_txn_candidate(
         return None
     lo_date = (received_at.date() - timedelta(days=PREFILTER_DATE_WINDOW)).isoformat()
     hi_date = (received_at.date() + timedelta(days=PREFILTER_DATE_WINDOW)).isoformat()
-    for amt in sorted(amounts, reverse=True):  # try largest first — usually the total
+    for amt in sorted(amounts, reverse=True):
         hit = conn.execute(
             """
             SELECT 1
@@ -430,8 +206,9 @@ def _has_txn_candidate(
 def _write_extraction(
     conn: sqlite3.Connection,
     email_id: str,
-    parsed: dict,
+    receipt: ExtractedReceipt,
     raw_json: str,
+    model: str = MODEL,
 ) -> int:
     """Update the email row; insert line items. Returns items written."""
     conn.execute(
@@ -450,41 +227,30 @@ def _write_extraction(
         WHERE id = ?
         """,
         (
-            parsed.get("merchant") or None,
-            _parse_date(parsed.get("date")),
-            _parse_amount(parsed.get("total")),
-            (parsed.get("currency") or "").upper() or None,
-            parsed.get("order_id") or None,
-            parsed.get("payment_method") or None,
-            MODEL,
+            receipt.merchant or None,
+            receipt.date or None,
+            receipt.total,
+            receipt.currency or None,
+            receipt.order_id or None,
+            receipt.payment_method or None,
+            model,
             datetime.now(timezone.utc).isoformat(),
             raw_json,
             email_id,
         ),
     )
 
-    items = parsed.get("items") or []
-    if not isinstance(items, list):
-        items = []
+    items = receipt.items or []
+
     # Carry over any already-matched transaction_v2_id so re-extractions on
-    # previously-matched emails produce items visible to the v2-join UIs,
-    # instead of orphaned items that wait for a match refresh.
+    # previously-matched emails produce items visible to the v2-join UIs.
     known_v2_id = conn.execute(
         "SELECT transaction_v2_id FROM emails WHERE id = ?", (email_id,)
     ).fetchone()
     txn_v2_id = known_v2_id[0] if known_v2_id else None
 
-    # Dedupe. Square-style senders ship multiple emails per invoice
-    # (invoice-created, reminder, payment-initiated, payment-processed)
-    # and each passes match-email onto the same ACH transaction. Running
-    # extract on all of them inserts the same line items 3-6× over,
-    # inflating the bundle's itemized-cost view.
-    #
-    # Strategy: one canonical email per (transaction_v2_id). If another
-    # email already owns the items and its data is at least as good as
-    # ours (non-NULL line_total count is the quality signal — reminder
-    # emails often lose the per-line prices), skip. If ours is strictly
-    # better, replace. Tie → keep existing (stable).
+    # Dedupe: one canonical email per (transaction_v2_id). See original
+    # extract.py comment for full rationale.
     new_quality = sum(
         1 for it in items if isinstance(it, dict) and _parse_amount(it.get("line_total")) is not None
     )
@@ -503,13 +269,13 @@ def _write_extraction(
         if existing is not None:
             existing_quality = existing[2] or 0
             if new_quality > existing_quality:
-                # We beat the incumbent — evict its items, then ours go in.
                 conn.execute(
                     "DELETE FROM transaction_items WHERE transaction_v2_id = ? AND email_id = ?",
                     (txn_v2_id, existing[0]),
                 )
             else:
                 return 0
+
     written = 0
     for i, item in enumerate(items, start=1):
         if not isinstance(item, dict):
@@ -541,11 +307,21 @@ def _write_extraction(
 # --- public API -------------------------------------------------------------
 
 
-def extract_pending(limit: int = 50) -> ExtractStats:
+def extract_pending(
+    limit: int = 50,
+    extractor: ReceiptExtractor | None = None,
+) -> ExtractStats:
+    """Drain the pending email queue using the given ReceiptExtractor.
+
+    If no extractor is provided, defaults to OllamaExtractor (NuExtract via
+    a locally-running Ollama server). B1.4 will wire in extractor dispatch
+    from the config so the caller chooses the backend.
+    """
+    if extractor is None:
+        extractor = OllamaExtractor()
+
     stats = ExtractStats()
     with connect() as conn:
-        # Make sure the seed senders are in the profile table. Cheap no-op
-        # after the first run.
         senders.seed_if_empty(conn)
 
         pending = _load_pending(conn, limit)
@@ -580,7 +356,7 @@ def extract_pending(limit: int = 50) -> ExtractStats:
 
             # Match-first prefilter: if no dollar amount in the body has a
             # plausible transaction candidate within the window, don't bother
-            # running NuExtract. See PROCESS.md milestone 8b.1 for context.
+            # running NuExtract.
             amounts = _extract_amounts(body.text)
             received = datetime.fromisoformat(row["received_at"])
             candidate = _has_txn_candidate(conn, amounts, received)
@@ -594,36 +370,42 @@ def extract_pending(limit: int = 50) -> ExtractStats:
                 conn.commit()
                 continue
 
-            # Venmo fast path: parse payment confirmation from subject + HTML body.
-            # Routed by from_addr check (not sender_profiles type) because the
-            # migration 008 CHECK constraint predates the venmo type.
-            is_venmo = "venmo@venmo.com" in (row["from_addr"] or "").lower()
-            if is_venmo and venmo_parser.is_venmo_payment(row["subject"]):
-                parsed = venmo_parser.parse(row["subject"], body.text)
-                if parsed is not None:
-                    # Also update the transaction's memo and payee with
-                    # the Venmo note if we can find the matching txn.
-                    venmo_note = parsed.pop("_venmo_note", "")
-                    venmo_party = parsed.pop("_venmo_other_party", "")
-                    parsed.pop("_venmo_direction", None)
-                    try:
-                        items_written = _write_extraction(
-                            conn, row["id"], parsed, json.dumps(parsed)
-                        )
-                        # If the note is non-empty, find matching Venmo
-                        # transactions and enrich them with the note.
+            # First-pass tier: deterministic parsers for known senders.
+            receipt = try_sender_parsers(
+                sender_type=sender_type,
+                from_addr=row["from_addr"] or "",
+                subject=row["subject"] or "",
+                body_text=body.text,
+                candidate=candidate,
+            )
+
+            if receipt is not None:
+                # Sender parser matched. For Venmo, also enrich the matching
+                # transaction's memo and payee with the payment note.
+                is_venmo = "venmo@venmo.com" in (row["from_addr"] or "").lower()
+                is_amazon = sender_type == "amazon"
+                is_square = "messaging.squareup.com" in (row["from_addr"] or "").lower()
+
+                if is_venmo:
+                    venmo_result = venmo_parser.parse(row["subject"] or "", body.text)
+                    venmo_note = venmo_result.pop("_venmo_note", "") if venmo_result else ""
+                    venmo_party = venmo_result.pop("_venmo_other_party", "") if venmo_result else ""
+                    if venmo_result:
+                        venmo_result.pop("_venmo_direction", None)
+
+                try:
+                    items_written = _write_extraction(
+                        conn, row["id"], receipt, json.dumps(receipt.__dict__)
+                    )
+                    stats.extracted += 1
+                    stats.items_written += items_written
+
+                    if is_venmo:
                         if venmo_note or venmo_party:
-                            total = _parse_amount(parsed.get("total"))
+                            total = receipt.total
                             if total is not None:
-                                lo_date = (
-                                    received - timedelta(days=7)
-                                ).date().isoformat()
-                                hi_date = (
-                                    received + timedelta(days=7)
-                                ).date().isoformat()
-                                # Memo/payee live on postings in v2. Update the
-                                # non-equity legs of any Venmo txn that matches
-                                # this receipt's amount + date window.
+                                lo_date = (received - timedelta(days=7)).date().isoformat()
+                                hi_date = (received + timedelta(days=7)).date().isoformat()
                                 conn.execute(
                                     """
                                     UPDATE postings
@@ -645,125 +427,54 @@ def extract_pending(limit: int = 50) -> ExtractStats:
                                         hi_date,
                                     ),
                                 )
-                        stats.extracted += 1
-                        stats.items_written += items_written
                         print(
                             f"  {row['id']}  venmo    "
                             f"{venmo_party[:20] if venmo_party else 'Venmo':20}  "
                             f"{venmo_note[:40] if venmo_note else '(no note)'}"
                         )
-                        conn.commit()
-                        continue
-                    except Exception as e:
-                        _mark_failed(conn, row["id"], f"venmo write error: {e}")
-                        stats.failed += 1
-                        conn.commit()
-                        continue
-
-            # TeamWork / Square invoice fast path. Deterministic pipe-table
-            # format; NuExtract misses single-item invoices and sometimes
-            # produces malformed JSON on long ones, so parse directly.
-            is_square = "messaging.squareup.com" in (row["from_addr"] or "").lower()
-            if is_square:
-                parsed = teamwork_parser.parse(body.text)
-                if parsed is not None and parsed.get("items"):
-                    try:
-                        items_written = _write_extraction(
-                            conn, row["id"], parsed, json.dumps(parsed)
-                        )
-                        stats.extracted += 1
-                        stats.items_written += items_written
-                        print(
-                            f"  {row['id']}  square   "
-                            f"{(parsed.get('merchant') or '')[:20]}  "
-                            f"+{items_written} items"
-                        )
-                        conn.commit()
-                        continue
-                    except Exception as e:
-                        _mark_failed(conn, row["id"], f"square write error: {e}")
-                        stats.failed += 1
-                        conn.commit()
-                        continue
-                # Parser returned nothing → fall through to NuExtract.
-
-            # Amazon fast path: templated text parser, no LLM.
-            if sender_type == "amazon":
-                parsed = amazon_parser.parse(body.text, matched_amount=candidate)
-                if parsed is not None and parsed.get("items"):
-                    try:
-                        items_written = _write_extraction(
-                            conn, row["id"], parsed, json.dumps(parsed)
-                        )
-                        stats.extracted += 1
+                    elif is_amazon:
                         stats.amazon_parsed += 1
-                        stats.items_written += items_written
-                        merchant = parsed.get("merchant") or "(no merchant)"
+                        merchant = receipt.merchant or "(no merchant)"
                         print(
                             f"  {row['id']}  amazon   {merchant[:20]}  "
                             f"+{items_written} items"
                         )
-                        conn.commit()
-                        continue
-                    except Exception as e:
-                        _mark_failed(conn, row["id"], f"amazon write error: {e}")
-                        stats.failed += 1
-                        conn.commit()
-                        continue
-                # Amazon parser returned nothing → fall through to NuExtract.
+                    elif is_square:
+                        print(
+                            f"  {row['id']}  square   "
+                            f"{(receipt.merchant or '')[:20]}  "
+                            f"+{items_written} items"
+                        )
+                    conn.commit()
+                    continue
+                except Exception as e:
+                    label = "venmo" if is_venmo else "amazon" if is_amazon else "square"
+                    _mark_failed(conn, row["id"], f"{label} write error: {e}")
+                    stats.failed += 1
+                    conn.commit()
+                    continue
 
+            # LLM extractor fallback (NuExtract via Ollama by default).
             try:
-                raw, elapsed = _call_nuextract(_build_prompt(body, candidate))
+                receipt = extractor.extract(
+                    eml_path,
+                    from_addr=body.from_addr,
+                    subject=body.subject,
+                    body_text=body.text,
+                    candidate=candidate,
+                )
                 stats.nuextract_calls += 1
+            except SystemExit:
+                raise  # friendly Ollama-unreachable error — propagate
             except Exception as e:
                 _mark_failed(conn, row["id"], f"nuextract error: {e}")
                 stats.failed += 1
                 continue
 
-            cleaned = _clean_output(raw)
             try:
-                parsed = json.loads(cleaned)
-            except json.JSONDecodeError as e:
-                _mark_failed(conn, row["id"], f"json decode: {e} :: {cleaned[:200]}")
-                stats.failed += 1
-                conn.commit()
-                continue
-
-            if not isinstance(parsed, dict):
-                _mark_failed(
-                    conn, row["id"], f"expected object, got {type(parsed).__name__}"
+                items_written = _write_extraction(
+                    conn, row["id"], receipt, json.dumps(receipt.__dict__)
                 )
-                stats.failed += 1
-                conn.commit()
-                continue
-
-            # Retry pass: if items came back empty on a body that clearly
-            # has itemized content, run a narrower items-only extraction.
-            items_list = parsed.get("items")
-            items_empty = not items_list or (
-                isinstance(items_list, list) and all(
-                    not (isinstance(it, dict) and (it.get("name") or "").strip())
-                    for it in items_list
-                )
-            )
-            if items_empty and _looks_itemized(body.text):
-                try:
-                    raw2, elapsed2 = _call_nuextract(
-                        _build_items_prompt(body, candidate)
-                    )
-                    cleaned2 = _clean_output(raw2)
-                    parsed2 = json.loads(cleaned2)
-                    if isinstance(parsed2, dict) and isinstance(
-                        parsed2.get("items"), list
-                    ):
-                        parsed["items"] = parsed2["items"]
-                        elapsed += elapsed2
-                except Exception:
-                    # Retry is best-effort; keep the original extraction.
-                    pass
-
-            try:
-                items_written = _write_extraction(conn, row["id"], parsed, cleaned)
             except Exception as e:
                 _mark_failed(conn, row["id"], f"write error: {e}")
                 stats.failed += 1
@@ -772,13 +483,12 @@ def extract_pending(limit: int = 50) -> ExtractStats:
 
             stats.extracted += 1
             stats.items_written += items_written
-            merchant = parsed.get("merchant") or "(no merchant)"
-            print(f"  {row['id']}  {elapsed:.1f}s  {merchant[:40]}  +{items_written} items")
+            merchant = receipt.merchant or "(no merchant)"
+            print(f"  {row['id']}  {merchant[:40]}  +{items_written} items")
 
-            # Learn new subscription senders on the fly so future emails
-            # from them skip NuExtract entirely.
+            # Learn new subscription senders on the fly.
             if sender_type is None and senders.looks_like_subscription(
-                parsed, row["subject"]
+                receipt.__dict__, row["subject"]
             ):
                 senders.upsert(
                     conn,
@@ -788,27 +498,8 @@ def extract_pending(limit: int = 50) -> ExtractStats:
                     note=f"auto-tagged from {row['id']}",
                 )
 
-            # Commit per-row so a later crash doesn't roll back earlier work.
             conn.commit()
     return stats
-
-
-# Receipts with itemized content tend to have at least a few lines that
-# contain both a word and a dollar amount near each other. This is a
-# heuristic trigger for the retry pass — cheap to compute and wrong in
-# either direction is tolerable (worst case: we run NuExtract once extra).
-# Two patterns:
-#   1. Classic: "Item name $9.99" (word + amount adjacent on same line)
-#   2. Pipe-table: "Item name | $9.99" (pipe-separated from _html_to_text)
-_ITEM_LINE_RE = re.compile(r"[A-Za-z][A-Za-z0-9 ,.&\-']{2,}\s+\$?\d+\.\d{2}")
-_PIPE_ITEM_RE = re.compile(r"[A-Za-z][A-Za-z0-9 ,.&\-']{2,}\s*\|\s*\$[\d,]+\.\d{2}")
-
-
-def _looks_itemized(text: str) -> bool:
-    return (
-        len(_ITEM_LINE_RE.findall(text)) >= 3
-        or len(_PIPE_ITEM_RE.findall(text)) >= 2
-    )
 
 
 def print_report(stats: ExtractStats) -> None:

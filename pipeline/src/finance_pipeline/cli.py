@@ -19,6 +19,7 @@ try:
     from .emails import classify as email_classify
     from .emails import classify_kind as email_classify_kind
     from .emails import extract as email_extract
+    from .emails.extractors.ollama import OllamaExtractor
     from .emails.fetchers.gmail import GmailFetcher, DEFAULT_QUERY as _GMAIL_DEFAULT_QUERY, print_report as _gmail_print_report, FetchStats as _GmailFetchStats
     from .emails import match as email_match
     from .emails import merchant_lookup
@@ -493,7 +494,8 @@ def cmd_backup(args: argparse.Namespace) -> int:
 
 
 def cmd_extract_email(args: argparse.Namespace) -> int:
-    stats = email_extract.extract_pending(limit=args.limit)
+    extractor = OllamaExtractor()  # B1.4 will replace with dispatch.get_extractor(cfg)
+    stats = email_extract.extract_pending(limit=args.limit, extractor=extractor)
     email_extract.print_report(stats)
     return 0
 
