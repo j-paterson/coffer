@@ -1,12 +1,9 @@
 # Coffer
 
-A self-hosted personal finance dashboard. Syncs bank, credit card,
-brokerage, and crypto data into a local SQLite database via a double-entry
-ledger, categorizes spending, and displays everything in a browser. Your
-financial data lives in a local SQLite database — Coffer never sends it to
-a Coffer-controlled server or analytics service. Sync calls go directly
-from your machine to whichever providers you configure (SimpleFIN,
-Coinbase, Zerion, Alchemy, DefiLlama, GeckoTerminal).
+A self-hosted personal finance dashboard. 
+
+Syncs all financial data into a local database using an industry standard double-entry ledger.
+Configurable Providers include: SimpleFIN, Coinbase, Zerion, Alchemy, DefiLlama & GeckoTerminal
 
 ## Features
 
