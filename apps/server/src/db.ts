@@ -4,7 +4,10 @@ import { fileURLToPath } from "node:url";
 import { applyMigrations as applyMigrationsImpl } from "@coffer/ledger/schema";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
-const DB_PATH = resolve(here, "../../../db/finance.sqlite");
+const DEFAULT_DB_PATH = resolve(here, "../../../db/finance.sqlite");
+const DB_PATH = process.env.FINANCE_DB
+  ? resolve(process.cwd(), process.env.FINANCE_DB)
+  : DEFAULT_DB_PATH;
 const MIGRATIONS_DIR = resolve(here, "../../../db/migrations");
 
 export function applyMigrations(db: Database): void {

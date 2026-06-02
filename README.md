@@ -24,6 +24,18 @@ Coinbase, Zerion, Alchemy, DefiLlama, GeckoTerminal).
 ![Spending breakdown](docs/screenshots/spending.png)
 ![Investments](docs/screenshots/investments.png)
 
+Screenshots are captured with Privacy mode on against the `simple_household`
+fixture. To regenerate after UI changes:
+
+```bash
+bun run screenshots
+```
+
+This boots a temporary server and Vite dev server (nothing else can be on
+ports 3001 or 5173), drives headless Chromium, and writes the three PNGs
+above. Requires the Playwright Chromium binary (`bunx playwright install chromium`
+on first use).
+
 ## Prerequisites
 
 - [Bun](https://bun.sh) v1.1+
