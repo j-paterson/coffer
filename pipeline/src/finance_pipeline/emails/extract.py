@@ -395,7 +395,7 @@ def extract_pending(
 
                 try:
                     items_written = _write_extraction(
-                        conn, row["id"], receipt, json.dumps(receipt.__dict__)
+                        conn, row["id"], receipt, json.dumps(receipt.__dict__), model=extractor.model
                     )
                     stats.extracted += 1
                     stats.items_written += items_written
@@ -473,7 +473,7 @@ def extract_pending(
 
             try:
                 items_written = _write_extraction(
-                    conn, row["id"], receipt, json.dumps(receipt.__dict__)
+                    conn, row["id"], receipt, json.dumps(receipt.__dict__), model=extractor.model
                 )
             except Exception as e:
                 _mark_failed(conn, row["id"], f"write error: {e}")

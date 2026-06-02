@@ -15,7 +15,9 @@ import json
 from pathlib import Path
 from typing import Iterator
 
+from ..db import insert_email, parse_eml_meta
 from ..interfaces import EmailFetcher
+from ...db import connect
 
 
 class ManualFetcher(EmailFetcher):
@@ -56,6 +58,10 @@ class ManualFetcher(EmailFetcher):
         for path in eml_files:
             if path.name in processed:
                 continue
+            msg_id = f"manual-{path.stem}"
+            from_addr, subject, received_at = parse_eml_meta(path)
+            with connect() as conn:
+                insert_email(conn, msg_id, received_at, from_addr, subject, path)
             yield path
 
     def mark_processed(self, email_id: str) -> None:

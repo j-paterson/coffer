@@ -204,8 +204,8 @@ def cmd_sync(args: argparse.Namespace) -> int:
             fetcher.max_results = args.max_results
         if args.query is not None and hasattr(fetcher, "query"):
             fetcher.query = args.query
-        for _ in fetcher.fetch_new():
-            pass  # paths are cached by the fetcher; cli.py doesn't need them here
+        for eml_path in fetcher.fetch_new():
+            fetcher.mark_processed(eml_path.name)
         if hasattr(fetcher, "stats"):
             _gmail_print_report(fetcher.stats)
         return 0

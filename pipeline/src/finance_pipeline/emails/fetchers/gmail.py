@@ -27,8 +27,9 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from ...config import GMAIL_CLIENT_SECRET, GMAIL_TOKEN, PROJECT_ROOT, RAW_EMAIL, SECRETS_DIR
+from ...config import GMAIL_CLIENT_SECRET, GMAIL_TOKEN, RAW_EMAIL, SECRETS_DIR
 from ...db import connect
+from ..db import insert_email
 from ..interfaces import EmailFetcher
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
@@ -251,28 +252,6 @@ def _existing_ids(conn: sqlite3.Connection) -> set[str]:
     return {r[0] for r in conn.execute("SELECT id FROM emails")}
 
 
-def _insert_email(
-    conn: sqlite3.Connection,
-    msg_id: str,
-    received_at: datetime,
-    from_addr: str,
-    subject: str,
-    raw_path: Path,
-) -> None:
-    conn.execute(
-        """
-        INSERT INTO emails (id, received_at, from_addr, subject, raw_path)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (
-            msg_id,
-            received_at.isoformat(),
-            from_addr,
-            subject,
-            str(raw_path.relative_to(PROJECT_ROOT)),
-        ),
-    )
-
 
 def print_report(stats: FetchStats) -> None:
     print(
@@ -364,7 +343,7 @@ class GmailFetcher(EmailFetcher):
                     print(f"  warn: raw fetch failed for {msg_id}: {e}")
                     continue
 
-                _insert_email(conn, msg_id, received_at, from_addr, subject, raw_path)
+                insert_email(conn, msg_id, received_at, from_addr, subject, raw_path)
                 self.stats.new += 1
                 yield raw_path
 

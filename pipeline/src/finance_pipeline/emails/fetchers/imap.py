@@ -14,8 +14,10 @@ import os
 from pathlib import Path
 from typing import Iterator
 
+from ..db import insert_email, parse_eml_meta
 from ..interfaces import EmailFetcher
 from ...config import RAW_EMAIL
+from ...db import connect
 
 # Capture the real error class at import time so tests that monkeypatch
 # imaplib.IMAP4 with a factory function don't break the `except` clauses.
@@ -118,6 +120,12 @@ class IMAPFetcher(EmailFetcher):
                 uid_str = uid.decode("ascii") if isinstance(uid, bytes) else str(uid)
                 eml_path = RAW_EMAIL / f"imap-{uid_str}.eml"
                 eml_path.write_bytes(raw_bytes)
+
+                msg_id = f"imap-{uid_str}"
+                from_addr, subject, received_at = parse_eml_meta(eml_path)
+                with connect() as db_conn:
+                    insert_email(db_conn, msg_id, received_at, from_addr, subject, eml_path)
+
                 yield eml_path
         finally:
             try:

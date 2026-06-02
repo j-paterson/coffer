@@ -67,17 +67,19 @@ def get_fetcher() -> EmailFetcher:
     if backend == "imap":
         try:
             from .fetchers.imap import IMAPFetcher
-        except ImportError:
+        except ImportError as e:
             raise BackendUnavailableError(
-                "IMAP fetcher backend not yet implemented (lands in B2.1)."
+                f"IMAP fetcher import failed: {e}. "
+                "Ensure [email] extras are installed: pip install -e ./pipeline[email]"
             )
         return IMAPFetcher(**{k: v for k, v in fetcher_cfg.items() if k != "backend"})
     if backend == "manual":
         try:
             from .fetchers.manual import ManualFetcher
-        except ImportError:
+        except ImportError as e:
             raise BackendUnavailableError(
-                "Manual fetcher backend not yet implemented (lands in B2.2)."
+                f"Manual fetcher import failed: {e}. "
+                "Ensure [email] extras are installed: pip install -e ./pipeline[email]"
             )
         return ManualFetcher(drop_directory=fetcher_cfg["drop_directory"])
     raise ValueError(f"Unknown email fetcher backend: {backend!r}")
@@ -97,17 +99,19 @@ def get_extractor() -> ReceiptExtractor:
     if backend == "anthropic":
         try:
             from .extractors.anthropic_api import AnthropicExtractor
-        except ImportError:
+        except ImportError as e:
             raise BackendUnavailableError(
-                "Anthropic extractor backend not yet implemented (lands in B3.1)."
+                f"Anthropic extractor import failed: {e}. "
+                "Ensure [email] extras are installed: pip install -e ./pipeline[email]"
             )
         return AnthropicExtractor(**{k: v for k, v in extractor_cfg.items() if k != "backend"})
     if backend == "openai":
         try:
             from .extractors.openai_api import OpenAIExtractor
-        except ImportError:
+        except ImportError as e:
             raise BackendUnavailableError(
-                "OpenAI extractor backend not yet implemented (lands in B3.2)."
+                f"OpenAI extractor import failed: {e}. "
+                "Ensure [email] extras are installed: pip install -e ./pipeline[email]"
             )
         return OpenAIExtractor(**{k: v for k, v in extractor_cfg.items() if k != "backend"})
     raise ValueError(f"Unknown email extractor backend: {backend!r}")
