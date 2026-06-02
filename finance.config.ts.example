@@ -19,5 +19,9 @@ export default defineConfig({
     // alchemy:       {},
     // geckoterminal: {},
     // coinbase:      {},
+    // email: {
+    //   fetcher: { backend: "gmail" },
+    //   extractor: { backend: "ollama" },
+    // },
   },
 });

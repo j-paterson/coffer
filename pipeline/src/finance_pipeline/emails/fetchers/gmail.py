@@ -278,8 +278,8 @@ class GmailFetcher(EmailFetcher):
     via the emails DB table's extraction_status column, which extract.py owns.
     """
 
-    def __init__(self, max_results: int = 100, query: str | None = None) -> None:
-        self.max_results = max_results
+    def __init__(self, max_results: int | None = None, query: str | None = None) -> None:
+        self.max_results = max_results if max_results is not None else 100
         self.query = query if query is not None else DEFAULT_QUERY
         self.stats: FetchStats = FetchStats()
 

@@ -207,9 +207,9 @@ class OllamaExtractor(ReceiptExtractor):
     an ExtractedReceipt.
     """
 
-    def __init__(self, url: str = OLLAMA_URL, model: str = MODEL) -> None:
-        self.url = url
-        self.model = model
+    def __init__(self, url: str | None = None, model: str | None = None) -> None:
+        self.url = url if url is not None else OLLAMA_URL
+        self.model = model if model is not None else MODEL
 
     # ------------------------------------------------------------------
     # ReceiptExtractor interface

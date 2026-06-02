@@ -17,6 +17,36 @@ import advisorRoute from "./routes/advisor";
 import { openProductionDb } from "./db";
 import { todayISO } from "@coffer/ledger/walker";
 import type { Ctx } from "./ctx";
+import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { EmailParserSchema, type FinanceConfigInput } from "@coffer/config";
+
+const REPO_ROOT = resolve(import.meta.dir, "../../../..");
+
+// On startup, load finance.config.ts (if present) and write the resolved
+// parsers.email config to db/.cache/email-config.json so the Python
+// pipeline can pick it up without a running Zod environment.
+(async () => {
+  const configPath = resolve(REPO_ROOT, "finance.config.ts");
+  if (!existsSync(configPath)) return;
+  try {
+    const mod = await import(pathToFileURL(configPath).href) as { default?: FinanceConfigInput };
+    const emailInput = mod.default?.parsers?.email;
+    if (!emailInput) return;
+    const parsed = EmailParserSchema.safeParse(emailInput);
+    if (!parsed.success) {
+      console.warn("[api] parsers.email config invalid — skipping cache write:", parsed.error.message);
+      return;
+    }
+    const cacheDir = resolve(REPO_ROOT, "db/.cache");
+    mkdirSync(cacheDir, { recursive: true });
+    writeFileSync(resolve(cacheDir, "email-config.json"), JSON.stringify(parsed.data, null, 2));
+    console.log("[api] wrote db/.cache/email-config.json from parsers.email config");
+  } catch (e) {
+    console.warn("[api] could not load finance.config.ts for email cache:", (e as Error).message);
+  }
+})();
 
 declare module "hono" {
   interface ContextVariableMap {

@@ -18,9 +18,9 @@ try:
     from .emails import aggregate as email_aggregate
     from .emails import classify as email_classify
     from .emails import classify_kind as email_classify_kind
+    from .emails import dispatch as email_dispatch
     from .emails import extract as email_extract
-    from .emails.extractors.ollama import OllamaExtractor
-    from .emails.fetchers.gmail import GmailFetcher, DEFAULT_QUERY as _GMAIL_DEFAULT_QUERY, print_report as _gmail_print_report, FetchStats as _GmailFetchStats
+    from .emails.fetchers.gmail import print_report as _gmail_print_report
     from .emails import match as email_match
     from .emails import merchant_lookup
     from .emails import shorten as email_shorten
@@ -198,13 +198,16 @@ def cmd_sync(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 1
-        fetcher = GmailFetcher(
-            query=args.query or _GMAIL_DEFAULT_QUERY,
-            max_results=args.max_results,
-        )
+        fetcher = email_dispatch.get_fetcher()
+        # CLI args override config when provided
+        if args.max_results is not None and hasattr(fetcher, "max_results"):
+            fetcher.max_results = args.max_results
+        if args.query is not None and hasattr(fetcher, "query"):
+            fetcher.query = args.query
         for _ in fetcher.fetch_new():
             pass  # paths are cached by the fetcher; cli.py doesn't need them here
-        _gmail_print_report(fetcher.stats)
+        if hasattr(fetcher, "stats"):
+            _gmail_print_report(fetcher.stats)
         return 0
     if source == "zerion":
         from .parsers import zerion
@@ -494,7 +497,7 @@ def cmd_backup(args: argparse.Namespace) -> int:
 
 
 def cmd_extract_email(args: argparse.Namespace) -> int:
-    extractor = OllamaExtractor()  # B1.4 will replace with dispatch.get_extractor(cfg)
+    extractor = email_dispatch.get_extractor()
     stats = email_extract.extract_pending(limit=args.limit, extractor=extractor)
     email_extract.print_report(stats)
     return 0
@@ -617,8 +620,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_sync.add_argument(
         "--max-results",
         type=int,
-        default=100,
-        help="Email: max messages to fetch per run (default: 100)",
+        default=None,
+        help="Email: max messages to fetch per run (default: 100, or from config)",
     )
     p_sync.add_argument(
         "--force",
