@@ -79,14 +79,15 @@ def test_imap_dispatch(with_config, monkeypatch):
     assert fetcher.__class__.__name__ == "IMAPFetcher"
 
 
-def test_manual_backend_raises_friendly_error(with_config):
-    """manual backend not landed yet — raises BackendUnavailableError."""
+def test_manual_dispatch(with_config, tmp_path):
+    """dispatch returns a ManualFetcher when configured."""
     with_config.write_text(json.dumps({
-        "fetcher": {"backend": "manual", "drop_directory": "/tmp/drop"},
+        "fetcher": {"backend": "manual", "drop_directory": str(tmp_path)},
         "extractor": {"backend": "ollama"},
     }))
-    with pytest.raises(dispatch.BackendUnavailableError):
-        dispatch.get_fetcher()
+    fetcher = dispatch.get_fetcher()
+    assert fetcher.__class__.__name__ == "ManualFetcher"
+    assert fetcher.drop_directory == tmp_path
 
 
 def test_malformed_config_falls_back_to_defaults(with_config, capsys):
