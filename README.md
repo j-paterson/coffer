@@ -14,7 +14,7 @@ Coinbase, Zerion, Alchemy, DefiLlama, GeckoTerminal).
 - **Multi-source sync** — SimpleFIN (banks), Zerion/Alchemy (crypto wallets),
   Coinbase (exchange), DefiLlama/GeckoTerminal (prices)
 - **Net worth tracking** — daily time series with drill-down by account
-- **Spending breakdown** — rule-based categorization, with optional [receipt itemization](docs/email.md) (requires Ollama + Gmail OAuth)
+- **Spending breakdown** — rule-based categorization, with optional [receipt itemization](docs/email.md) (pluggable email + LLM backends)
 - **Investment tracking** — holdings, cost basis, realized P&L
 - **Privacy mode** — blur all amounts for screen sharing
 
@@ -120,13 +120,21 @@ Useful sidecar commands:
 ### Email receipt extraction (optional)
 
 For per-line-item spending breakdown from receipt emails, install with
-the `[email]` extras group and set up Ollama + a Gmail OAuth credential.
+the `[email]` extras group and pick an email fetcher (Gmail OAuth, IMAP,
+or manual `.eml` drop-in) + extractor (local Ollama, Anthropic, or OpenAI).
 See [docs/email.md](docs/email.md).
 
 ## Architecture
 
 For the accounting model, data flow, and monorepo layout, see
 [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Continuous integration
+
+GitHub Actions runs `bun run typecheck` and `bun run test` on every push
+and PR. The Python sidecar tests in `pipeline/tests/` are not run in CI
+yet — to verify changes that touch `pipeline/`, run `pipeline/.venv/bin/pytest`
+locally.
 
 ## License
 

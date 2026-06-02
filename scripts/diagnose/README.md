@@ -10,7 +10,7 @@ API.
 bun run scripts/diagnose/diagnose.ts <command> [...args]
 ```
 
-Or add to `dashboard/package.json`:
+Or add to root `package.json` for shorter invocation:
 
 ```json
 { "scripts": { "diagnose": "bun run scripts/diagnose/diagnose.ts" } }

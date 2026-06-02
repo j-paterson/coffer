@@ -75,6 +75,8 @@ is computed over full history; there is no walker floor.
 | `position_snapshots` | Crypto holdings mark-to-market; position, as_of, qty, price_usd |
 | `asset_prices` | Daily price per (chain, contract, symbol) tuple |
 | `raw_events` | Append-only audit log of every parser payload |
+| `emails` | Receipt email cache; extraction and match state per email |
+| `transaction_items` | Per-line-item breakdown linked to emails and transactions |
 | `data_sources` | Provider config and trust ranks for dedup decisions |
 | `cohort_sessions` | Per-canonical session windows for time-segmented analysis |
 
