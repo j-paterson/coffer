@@ -1,17 +1,10 @@
-"""Gmail fetcher for milestone 8b receipt enrichment.
+"""Gmail OAuth fetcher.
 
-Uses the Gmail API via google-api-python-client with an installed-app
-OAuth flow. Credentials are stored in `.secrets/` (gitignored):
+Implements EmailFetcher for users with a Google Cloud OAuth client
+credential. Caches .eml bodies under raw/email/YYYY-MM-DD/ keyed by
+Gmail message id.
 
-    .secrets/gmail_client.json   — OAuth client ID (user-provided, one-time)
-    .secrets/gmail_token.json    — refresh token (written on first run)
-
-The fetcher searches Gmail for receipt-looking messages, caches each
-raw RFC822 message to `raw/email/YYYY-MM-DD/<id>.eml`, and inserts a
-row into the `emails` table with `extraction_status='pending'`.
-
-Extraction itself (NuExtract) runs in a separate pass — this module
-only handles "get the bytes + remember we have them".
+See docs/email.md for setup (credential creation + browser OAuth flow).
 """
 from __future__ import annotations
 
@@ -26,6 +19,7 @@ import urllib.parse
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Iterator
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -33,8 +27,9 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from ..config import GMAIL_CLIENT_SECRET, GMAIL_TOKEN, PROJECT_ROOT, RAW_EMAIL, SECRETS_DIR
-from ..db import connect
+from ...config import GMAIL_CLIENT_SECRET, GMAIL_TOKEN, PROJECT_ROOT, RAW_EMAIL, SECRETS_DIR
+from ...db import connect
+from ..interfaces import EmailFetcher
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
@@ -337,3 +332,85 @@ def print_report(stats: FetchStats) -> None:
         f"searched {stats.searched}  new {stats.new}  "
         f"skipped {stats.skipped_existing}  errors {stats.errors}"
     )
+
+
+class GmailFetcher(EmailFetcher):
+    """Wraps the Gmail OAuth fetch loop into the EmailFetcher contract.
+
+    fetch_new() runs sync() and yields the .eml Path for every newly-cached
+    message. mark_processed() is a no-op for Gmail — the fetcher tracks state
+    via the emails DB table's extraction_status column, which extract.py owns.
+    """
+
+    def __init__(self, max_results: int = 100, query: str | None = None) -> None:
+        self.max_results = max_results
+        self.query = query if query is not None else DEFAULT_QUERY
+
+    def fetch_new(self) -> Iterator[Path]:
+        """Run the Gmail sync and yield .eml paths for every newly-fetched message."""
+        stats = FetchStats()
+        service = _gmail_service()
+
+        try:
+            resp = (
+                service.users()
+                .messages()
+                .list(userId="me", q=self.query, maxResults=self.max_results)
+                .execute()
+            )
+        except HttpError as e:
+            raise RuntimeError(f"Gmail list failed: {e}") from e
+
+        messages = resp.get("messages", [])
+        stats.searched = len(messages)
+        if not messages:
+            return
+
+        with connect() as conn:
+            existing = _existing_ids(conn)
+            for m in messages:
+                msg_id = m["id"]
+                if msg_id in existing:
+                    stats.skipped_existing += 1
+                    continue
+                try:
+                    meta = (
+                        service.users()
+                        .messages()
+                        .get(
+                            userId="me",
+                            id=msg_id,
+                            format="metadata",
+                            metadataHeaders=["From", "Subject", "Date"],
+                        )
+                        .execute()
+                    )
+                except HttpError as e:
+                    stats.errors += 1
+                    print(f"  warn: metadata fetch failed for {msg_id}: {e}")
+                    continue
+
+                headers = meta.get("payload", {}).get("headers", [])
+                received_at = _parse_internal_date(meta["internalDate"])
+                from_addr = _header(headers, "From")
+                subject = _header(headers, "Subject") or "(no subject)"
+
+                raw_path = _eml_path(msg_id, received_at)
+                try:
+                    if not raw_path.exists():
+                        _write_raw(service, msg_id, raw_path)
+                except HttpError as e:
+                    stats.errors += 1
+                    print(f"  warn: raw fetch failed for {msg_id}: {e}")
+                    continue
+
+                _insert_email(conn, msg_id, received_at, from_addr, subject, raw_path)
+                stats.new += 1
+                yield raw_path
+
+    def mark_processed(self, email_id: str) -> None:
+        """No-op: Gmail fetch state is tracked via the emails DB table.
+
+        The extraction_status column (managed by extract.py) serves as the
+        processed marker. Nothing to write here at fetch time.
+        """

@@ -19,7 +19,7 @@ try:
     from .emails import classify as email_classify
     from .emails import classify_kind as email_classify_kind
     from .emails import extract as email_extract
-    from .emails import fetcher as email_fetcher
+    from .emails.fetchers.gmail import GmailFetcher, DEFAULT_QUERY as _GMAIL_DEFAULT_QUERY, print_report as _gmail_print_report, FetchStats as _GmailFetchStats
     from .emails import match as email_match
     from .emails import merchant_lookup
     from .emails import shorten as email_shorten
@@ -197,11 +197,12 @@ def cmd_sync(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 1
-        stats = email_fetcher.sync(
-            query=args.query or email_fetcher.DEFAULT_QUERY,
+        from .emails.fetchers.gmail import sync as _gmail_sync
+        stats = _gmail_sync(
+            query=args.query or _GMAIL_DEFAULT_QUERY,
             max_results=args.max_results,
         )
-        email_fetcher.print_report(stats)
+        _gmail_print_report(stats)
         return 0
     if source == "zerion":
         from .parsers import zerion
