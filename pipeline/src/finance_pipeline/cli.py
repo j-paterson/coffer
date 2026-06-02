@@ -197,12 +197,13 @@ def cmd_sync(args: argparse.Namespace) -> int:
                 file=sys.stderr,
             )
             return 1
-        from .emails.fetchers.gmail import sync as _gmail_sync
-        stats = _gmail_sync(
+        fetcher = GmailFetcher(
             query=args.query or _GMAIL_DEFAULT_QUERY,
             max_results=args.max_results,
         )
-        _gmail_print_report(stats)
+        for _ in fetcher.fetch_new():
+            pass  # paths are cached by the fetcher; cli.py doesn't need them here
+        _gmail_print_report(fetcher.stats)
         return 0
     if source == "zerion":
         from .parsers import zerion

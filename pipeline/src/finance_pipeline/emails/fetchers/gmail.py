@@ -263,70 +263,6 @@ def _insert_email(
     )
 
 
-def sync(query: str = DEFAULT_QUERY, max_results: int = 100) -> FetchStats:
-    """Search Gmail, cache raw .eml bytes, insert pending email rows."""
-    stats = FetchStats()
-    service = _gmail_service()
-
-    try:
-        resp = (
-            service.users()
-            .messages()
-            .list(userId="me", q=query, maxResults=max_results)
-            .execute()
-        )
-    except HttpError as e:
-        raise RuntimeError(f"Gmail list failed: {e}") from e
-
-    messages = resp.get("messages", [])
-    stats.searched = len(messages)
-    if not messages:
-        return stats
-
-    with connect() as conn:
-        existing = _existing_ids(conn)
-        for m in messages:
-            msg_id = m["id"]
-            if msg_id in existing:
-                stats.skipped_existing += 1
-                continue
-            try:
-                meta = (
-                    service.users()
-                    .messages()
-                    .get(
-                        userId="me",
-                        id=msg_id,
-                        format="metadata",
-                        metadataHeaders=["From", "Subject", "Date"],
-                    )
-                    .execute()
-                )
-            except HttpError as e:
-                stats.errors += 1
-                print(f"  warn: metadata fetch failed for {msg_id}: {e}")
-                continue
-
-            headers = meta.get("payload", {}).get("headers", [])
-            received_at = _parse_internal_date(meta["internalDate"])
-            from_addr = _header(headers, "From")
-            subject = _header(headers, "Subject") or "(no subject)"
-
-            raw_path = _eml_path(msg_id, received_at)
-            try:
-                if not raw_path.exists():
-                    _write_raw(service, msg_id, raw_path)
-            except HttpError as e:
-                stats.errors += 1
-                print(f"  warn: raw fetch failed for {msg_id}: {e}")
-                continue
-
-            _insert_email(conn, msg_id, received_at, from_addr, subject, raw_path)
-            stats.new += 1
-
-    return stats
-
-
 def print_report(stats: FetchStats) -> None:
     print(
         f"searched {stats.searched}  new {stats.new}  "
@@ -345,10 +281,11 @@ class GmailFetcher(EmailFetcher):
     def __init__(self, max_results: int = 100, query: str | None = None) -> None:
         self.max_results = max_results
         self.query = query if query is not None else DEFAULT_QUERY
+        self.stats: FetchStats = FetchStats()
 
     def fetch_new(self) -> Iterator[Path]:
         """Run the Gmail sync and yield .eml paths for every newly-fetched message."""
-        stats = FetchStats()
+        self.stats = FetchStats()
         service = _gmail_service()
 
         try:
@@ -362,7 +299,7 @@ class GmailFetcher(EmailFetcher):
             raise RuntimeError(f"Gmail list failed: {e}") from e
 
         messages = resp.get("messages", [])
-        stats.searched = len(messages)
+        self.stats.searched = len(messages)
         if not messages:
             return
 
@@ -371,7 +308,7 @@ class GmailFetcher(EmailFetcher):
             for m in messages:
                 msg_id = m["id"]
                 if msg_id in existing:
-                    stats.skipped_existing += 1
+                    self.stats.skipped_existing += 1
                     continue
                 try:
                     meta = (
@@ -386,7 +323,7 @@ class GmailFetcher(EmailFetcher):
                         .execute()
                     )
                 except HttpError as e:
-                    stats.errors += 1
+                    self.stats.errors += 1
                     print(f"  warn: metadata fetch failed for {msg_id}: {e}")
                     continue
 
@@ -400,12 +337,12 @@ class GmailFetcher(EmailFetcher):
                     if not raw_path.exists():
                         _write_raw(service, msg_id, raw_path)
                 except HttpError as e:
-                    stats.errors += 1
+                    self.stats.errors += 1
                     print(f"  warn: raw fetch failed for {msg_id}: {e}")
                     continue
 
                 _insert_email(conn, msg_id, received_at, from_addr, subject, raw_path)
-                stats.new += 1
+                self.stats.new += 1
                 yield raw_path
 
     def mark_processed(self, email_id: str) -> None:
