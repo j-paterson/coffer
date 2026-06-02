@@ -59,13 +59,33 @@ def test_unknown_extractor_backend(with_config):
         dispatch.get_extractor()
 
 
-def test_unimplemented_backends_raise_friendly_error(with_config):
-    """IMAP/manual/anthropic/openai not landed yet — raise BackendUnavailableError."""
+def test_imap_dispatch(with_config, monkeypatch):
+    """dispatch returns an IMAPFetcher when configured."""
+    monkeypatch.setenv("IMAP_USERNAME", "u")
+    monkeypatch.setenv("IMAP_PASSWORD", "p")
     with_config.write_text(json.dumps({
-        "fetcher": {"backend": "imap", "host": "imap.example.com", "username_env": "FOO", "password_env": "BAR"},
+        "fetcher": {
+            "backend": "imap",
+            "host": "imap.example.com",
+            "port": 993,
+            "use_ssl": True,
+            "username_env": "IMAP_USERNAME",
+            "password_env": "IMAP_PASSWORD",
+            "folder": "INBOX",
+        },
         "extractor": {"backend": "ollama"},
     }))
-    with pytest.raises(dispatch.BackendUnavailableError, match="lands in B2.1"):
+    fetcher = dispatch.get_fetcher()
+    assert fetcher.__class__.__name__ == "IMAPFetcher"
+
+
+def test_manual_backend_raises_friendly_error(with_config):
+    """manual backend not landed yet — raises BackendUnavailableError."""
+    with_config.write_text(json.dumps({
+        "fetcher": {"backend": "manual", "drop_directory": "/tmp/drop"},
+        "extractor": {"backend": "ollama"},
+    }))
+    with pytest.raises(dispatch.BackendUnavailableError):
         dispatch.get_fetcher()
 
 
