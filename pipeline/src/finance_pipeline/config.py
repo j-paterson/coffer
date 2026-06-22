@@ -1,4 +1,5 @@
 """Centralized project paths."""
+import os
 from pathlib import Path
 
 # Project root is two levels above this file's package:
@@ -7,7 +8,15 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 DB_DIR = PROJECT_ROOT / "db"
-DB_PATH = DB_DIR / "finance.sqlite"
+
+# Honor FINANCE_DB so the sidecar targets the same database as the TS server
+# and CLI, both of which read FINANCE_DB. This keeps post-sync hooks correct
+# when the database is relocated outside the checkout (e.g. a dog-fooding
+# instance with FINANCE_DB=~/coffer-data/finance.sqlite). Falls back to the
+# in-repo default when unset.
+_FINANCE_DB = os.environ.get("FINANCE_DB")
+DB_PATH = Path(_FINANCE_DB).resolve() if _FINANCE_DB else DB_DIR / "finance.sqlite"
+
 MIGRATIONS_DIR = DB_DIR / "migrations"
 
 RAW_DIR = PROJECT_ROOT / "raw"
