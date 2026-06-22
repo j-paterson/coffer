@@ -67,6 +67,7 @@ class CategorizeStats:
     transfer_txns: int = 0
     rule_hits: dict[str, int] = field(default_factory=lambda: defaultdict(int))
     unmatched_sample: list[tuple[float, str]] = field(default_factory=list)
+    learned_applied: int = 0
 
 
 def load_rules(path: Path = RULES_PATH) -> RuleSet:
@@ -375,6 +376,52 @@ def _merge_tags(existing: str | None, *new_tags: str) -> str:
     return ",".join(sorted(parts))
 
 
+def apply_learned_rules(conn: sqlite3.Connection, dry_run: bool = False) -> int:
+    """Forward-apply learned keyword->category mappings (user_item_rules).
+
+    The server records a learned rule each time a user sets a category in the
+    UI, but historically nothing re-applied it — so a categorized merchant
+    reappeared as Uncategorized on the next sync. This applies those mappings
+    to items that are still uncategorized.
+
+    Only touches genuinely-uncategorized items: never an already-set category
+    (so rules.yaml and receipt/user provenance win) and never a 'user' row (a
+    deliberate clear sets category NULL + source 'user'). Higher-hit keywords
+    are applied first, so they win keyword conflicts and lower-hit rules cannot
+    overwrite them.
+    """
+    learned = conn.execute(
+        "SELECT keyword, category, hits FROM user_item_rules "
+        "WHERE keyword IS NOT NULL AND TRIM(keyword) != '' "
+        "ORDER BY hits DESC, category ASC"
+    ).fetchall()
+
+    guard = (
+        "category IS NULL "
+        "AND (category_source IS NULL OR category_source != 'user') "
+        "AND LOWER(COALESCE(short_name, name)) LIKE ?"
+    )
+    applied = 0
+    for row in learned:
+        keyword = (row["keyword"] or "").strip().lower()
+        if not keyword:
+            continue
+        like = f"%{keyword}%"
+        if dry_run:
+            applied += conn.execute(
+                f"SELECT COUNT(*) AS n FROM transaction_items WHERE {guard}",
+                (like,),
+            ).fetchone()["n"]
+            continue
+        cur = conn.execute(
+            f"UPDATE transaction_items "
+            f"SET category = ?, category_source = 'learned' WHERE {guard}",
+            (row["category"], like),
+        )
+        applied += cur.rowcount or 0
+    return applied
+
+
 def categorize(
     rules_path: Path = RULES_PATH,
     dry_run: bool = False,
@@ -492,6 +539,10 @@ def _run_categorize(
                     (txn["amount"], txn["description"])
                 )
 
+    # Forward-apply learned rules to anything still uncategorized, so past
+    # manual categorizations carry over to newly-synced transactions.
+    stats.learned_applied = apply_learned_rules(conn, dry_run)
+
     return stats
 
 
@@ -502,6 +553,7 @@ def print_report(stats: CategorizeStats) -> None:
     print(f"transfer pairs:   {stats.transfer_pairs} ({stats.transfer_txns} txns)")
     print(f"rules matched:    {stats.matched} ({pct:.1f}%)")
     print(f"unmatched:        {stats.processed - stats.matched}")
+    print(f"learned applied:  {stats.learned_applied}")
     print()
     if stats.rule_hits:
         print("per-rule hits:")
