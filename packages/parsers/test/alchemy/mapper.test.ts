@@ -54,7 +54,7 @@ describe("buildAccountDraft", () => {
     expect(draft.institution).toBe("alchemy");
     expect(draft.source).toBe("alchemy");
     expect(draft.mode).toBe("live");
-    expect(draft.type).toBe("crypto_wallet");
+    expect(draft.type).toBe("crypto");
     expect(draft.currency).toBe("USD");
   });
 

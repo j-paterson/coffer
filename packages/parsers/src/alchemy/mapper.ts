@@ -39,7 +39,7 @@ export function buildAccountDraft(chain: AlchemyChain, addr: string): AccountDra
     id: accountId,
     display_name: `${titleChain} ${shortAddr(addrLower)}`,
     institution: "alchemy",
-    type: "crypto_wallet",
+    type: "crypto",
     currency: "USD",
     mode: "live",
     external_id: accountId,

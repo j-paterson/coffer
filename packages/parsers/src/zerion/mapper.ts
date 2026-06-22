@@ -87,7 +87,7 @@ export function mapPositions(
           id: accountId,
           display_name: `Zerion ${chain} ${shortAddr(addr)}`,
           institution: "zerion",
-          type: "crypto_wallet",
+          type: "crypto",
           currency: "USD",
           mode: "live",
           external_id: accountId,

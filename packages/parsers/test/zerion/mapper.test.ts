@@ -58,7 +58,7 @@ describe("mapPositions", () => {
     expect(ops[0]!.kind).toBe("account_discovery");
     expect((ops[0] as { draft: { id: string } }).draft.id).toBe(`zerion:ethereum:${ADDR_LOWER}`);
     expect((ops[0] as { draft: { institution: string; type: string; mode: string } }).draft.institution).toBe("zerion");
-    expect((ops[0] as { draft: { institution: string; type: string; mode: string } }).draft.type).toBe("crypto_wallet");
+    expect((ops[0] as { draft: { institution: string; type: string; mode: string } }).draft.type).toBe("crypto");
     expect((ops[0] as { draft: { institution: string; type: string; mode: string } }).draft.mode).toBe("live");
 
     expect(ops[1]!.kind).toBe("position_snapshot");
