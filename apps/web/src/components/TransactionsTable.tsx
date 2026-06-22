@@ -37,6 +37,9 @@ interface Props {
   /** Map of account_id → display name. When provided, an Account column
    *  is shown between Description and Amount. */
   accountNames?: Map<string, string>;
+  /** Forwarded to each row: render a transaction-level category control that
+   *  applies the chosen category to all of the transaction's line items. */
+  categorizeTransaction?: boolean;
 }
 
 const RECIPIENT_PATTERNS: { test: RegExp; label: string }[] = [
@@ -71,6 +74,7 @@ export function TransactionsTable({
   onTransactionContextMenu,
   selection,
   accountNames,
+  categorizeTransaction = false,
 }: Props) {
   const [sortKey, setSortKey] = useState<TxnSortKey>(defaultSortKey);
   const [sortDir, setSortDir] = useState<TxnSortDir>(defaultSortDir);
@@ -141,6 +145,7 @@ export function TransactionsTable({
                     onContextMenu={onTransactionContextMenu}
                     selection={selection}
                     accountNames={accountNames}
+                    categorizeTransaction={categorizeTransaction}
                   />
                 ))}
                 <tr className="bg-stone-50/70 text-xs">
@@ -172,6 +177,7 @@ export function TransactionsTable({
                 onContextMenu={onTransactionContextMenu}
                 selection={selection}
                 accountNames={accountNames}
+                categorizeTransaction={categorizeTransaction}
               />
             ))}
       </tbody>

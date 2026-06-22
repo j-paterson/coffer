@@ -664,6 +664,7 @@ export function Spending() {
                     <TransactionsTable
                       transactions={visible}
                       showCategoryBadge={false}
+                      categorizeTransaction
                       filterItemCategory={filterKey}
                       onTransactionContextMenu={handleContextMenu}
                       selection={{
@@ -759,6 +760,7 @@ export function Spending() {
                       <TransactionsTable
                         transactions={txns}
                         showCategoryBadge={false}
+                        categorizeTransaction
                         onTransactionContextMenu={handleContextMenu}
                         selection={{
                           selectedItemIds,

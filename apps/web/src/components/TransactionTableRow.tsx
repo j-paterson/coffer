@@ -4,6 +4,7 @@ import type { CategoryHierarchy, TransactionItem, TransactionRow } from "../lib/
 import { formatDate } from "../lib/format";
 import { usePrivateFormat } from "../lib/privacy";
 import {
+  useBulkPatchItemCategory,
   useBundleDetail,
   useItemCategories,
   usePatchItemCategory,
@@ -40,6 +41,11 @@ interface Props {
     onToggle: (itemIds: number[]) => void;
   };
   accountNames?: Map<string, string>;
+  /** When true, render a transaction-level category control that applies the
+   *  chosen category to ALL of the transaction's line items at once (it
+   *  ripples to the sub-items). Used by the Spending drill-down, where the
+   *  per-transaction inline badge is otherwise suppressed. */
+  categorizeTransaction?: boolean;
 }
 
 export const UNCLASSIFIED_SENTINEL = "__unclassified__";
@@ -57,6 +63,7 @@ export function TransactionTableRow({
   onContextMenu: onRowContextMenu,
   selection,
   accountNames,
+  categorizeTransaction = false,
 }: Props) {
   const fmt = usePrivateFormat();
   const allItems = txn.items ?? [];
@@ -162,6 +169,12 @@ export function TransactionTableRow({
                 items={allItems}
                 onExpand={() => setOpen((v) => !v)}
               />
+            )}
+
+            {/* Transaction-level categorize: one dropdown that applies the
+                chosen category to every line item in the transaction. */}
+            {categorizeTransaction && hasItems && (
+              <TransactionCategoryDropdown txn={txn} />
             )}
 
             {hasReceipt && (
@@ -329,6 +342,66 @@ function SingleItemCategoryDropdown({
       hierarchy={hierarchy}
       suggested={suggested}
       disabled={patchCategory.isPending}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TransactionCategoryDropdown
+// A transaction-level CategoryDropdown that bulk-applies the chosen category
+// to every line item in the transaction (the "ripple to sub-items"). Shows
+// the transaction's common category, or unset when its items disagree.
+// ---------------------------------------------------------------------------
+
+function TransactionCategoryDropdown({ txn }: { txn: TransactionRow }) {
+  const items = txn.items ?? [];
+  const categoriesQ = useItemCategories();
+  const hierarchy: CategoryHierarchy = categoriesQ.data ?? [];
+  const bundleQ = useBundleDetail(txn.bundle_id);
+  const suggested: CategoryHierarchy = bundleQ.data?.category_options ?? [];
+  const bulkPatch = useBulkPatchItemCategory();
+
+  // Common value across items, or null when they disagree (shown as unset).
+  const common = (pick: (it: TransactionItem) => string | null): string | null => {
+    const distinct = new Set(items.map(pick));
+    return distinct.size === 1 ? (items[0] ? pick(items[0]) : null) : null;
+  };
+  const derived = {
+    category: common((it) => it.category),
+    subcategory: common((it) => it.subcategory),
+  };
+
+  // Optimistic local state (mirrors SingleItemCategoryDropdown): update the
+  // pill immediately, resync when the underlying items change after refetch.
+  const [localValue, setLocalValue] = useState(derived);
+  const [syncedSig, setSyncedSig] = useState(
+    `${derived.category}|${derived.subcategory}`,
+  );
+  const derivedSig = `${derived.category}|${derived.subcategory}`;
+  if (derivedSig !== syncedSig) {
+    setSyncedSig(derivedSig);
+    setLocalValue(derived);
+  }
+
+  const handleChange = async (next: {
+    category: string | null;
+    subcategory: string | null;
+  }) => {
+    setLocalValue(next);
+    await bulkPatch.mutateAsync({
+      ids: items.map((it) => it.id),
+      category: next.category,
+      subcategory: next.subcategory,
+    });
+  };
+
+  return (
+    <CategoryDropdown
+      value={localValue}
+      onChange={handleChange}
+      hierarchy={hierarchy}
+      suggested={suggested}
+      disabled={bulkPatch.isPending}
     />
   );
 }
