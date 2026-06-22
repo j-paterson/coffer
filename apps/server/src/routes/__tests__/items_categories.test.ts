@@ -92,7 +92,7 @@ test("PATCH /api/items/:id sets category and subcategory atomically", async () =
   const row = db
     .prepare("SELECT category, subcategory FROM transaction_items WHERE id = ?")
     .get(id) as { category: string | null; subcategory: string | null };
-  expect(row.category).toBe("food");
+  expect(row.category).toBe("Food");
   expect(row.subcategory).toBe("Coffee");
 });
 
@@ -185,9 +185,9 @@ test("PATCH propagates by merchant when keyword extractor fails on noise", async
   const tagged = db
     .prepare("SELECT id, category, category_source FROM transaction_items WHERE id IN (10,11,12,13) ORDER BY id")
     .all() as { id: number; category: string | null; category_source: string | null }[];
-  expect(tagged[0]).toEqual({ id: 10, category: "income", category_source: "user" });
-  expect(tagged[1]).toEqual({ id: 11, category: "income", category_source: "learned" });
-  expect(tagged[2]).toEqual({ id: 12, category: "income", category_source: "learned" });
+  expect(tagged[0]).toEqual({ id: 10, category: "Income", category_source: "user" });
+  expect(tagged[1]).toEqual({ id: 11, category: "Income", category_source: "learned" });
+  expect(tagged[2]).toEqual({ id: 12, category: "Income", category_source: "learned" });
   // Starbucks is untouched.
   expect(tagged[3].category).toBeNull();
 });
@@ -216,8 +216,8 @@ test("PATCH merchant propagation strips Web ID/dot-com noise across varying suff
   const paypal = db
     .prepare("SELECT id, category FROM transaction_items WHERE id IN (20,21) ORDER BY id")
     .all() as { id: number; category: string | null }[];
-  expect(paypal[0].category).toBe("transfer");
-  expect(paypal[1].category).toBe("transfer");
+  expect(paypal[0].category).toBe("Transfer");
+  expect(paypal[1].category).toBe("Transfer");
 });
 
 test("PATCH merchant propagation skips user-categorized items", async () => {
@@ -244,7 +244,7 @@ test("PATCH merchant propagation skips user-categorized items", async () => {
   const after = db
     .prepare("SELECT id, category, category_source FROM transaction_items WHERE id IN (10,11) ORDER BY id")
     .all() as { id: number; category: string | null; category_source: string | null }[];
-  expect(after[0].category).toBe("income");
+  expect(after[0].category).toBe("Income");
   expect(after[0].category_source).toBe("user");
   // Item 11 was user-categorized — must not be overwritten.
   expect(after[1].category).toBe("gifts");
@@ -273,9 +273,9 @@ test("PATCH /categories/bulk updates many items in one call", async () => {
   const rows = db
     .prepare("SELECT id, category, subcategory, category_source FROM transaction_items ORDER BY id")
     .all() as { id: number; category: string | null; subcategory: string | null; category_source: string | null }[];
-  expect(rows[0]).toEqual({ id: 1, category: "food", subcategory: "Groceries", category_source: "user" });
-  expect(rows[1]).toEqual({ id: 2, category: "food", subcategory: "Groceries", category_source: "user" });
-  expect(rows[2]).toEqual({ id: 3, category: "food", subcategory: "Groceries", category_source: "user" });
+  expect(rows[0]).toEqual({ id: 1, category: "Food", subcategory: "Groceries", category_source: "user" });
+  expect(rows[1]).toEqual({ id: 2, category: "Food", subcategory: "Groceries", category_source: "user" });
+  expect(rows[2]).toEqual({ id: 3, category: "Food", subcategory: "Groceries", category_source: "user" });
   // Item 4 was not in ids — must be untouched.
   expect(rows[3]).toEqual({ id: 4, category: null, subcategory: null, category_source: null });
 });
@@ -384,8 +384,8 @@ test("PATCH /categories/merge normalizes from + to before matching", async () =>
   // silently leak a new mixed-case category.
   db.prepare(
     `INSERT INTO transaction_items (name, line_total, category, line_no)
-     VALUES ('Starbucks', 5.00, 'restaurants', 1),
-            ('Cafe Mona', 4.50, 'restaurants', 1)`,
+     VALUES ('Starbucks', 5.00, 'Restaurants', 1),
+            ('Cafe Mona', 4.50, 'Restaurants', 1)`,
   ).run();
 
   const app = makeApp(db);
@@ -396,14 +396,14 @@ test("PATCH /categories/merge normalizes from + to before matching", async () =>
   });
   expect(res.status).toBe(200);
   const body = await res.json() as { from: string; to: string; items_updated: number };
-  expect(body.from).toBe("restaurants");
-  expect(body.to).toBe("dining");
+  expect(body.from).toBe("Restaurants");
+  expect(body.to).toBe("Dining");
   expect(body.items_updated).toBe(2);
 
   const rows = db
     .prepare("SELECT category FROM transaction_items ORDER BY id")
     .all() as { category: string }[];
-  expect(rows.map((r) => r.category)).toEqual(["dining", "dining"]);
+  expect(rows.map((r) => r.category)).toEqual(["Dining", "Dining"]);
 });
 
 test("PATCH /:id/kind route no longer exists (404 from router)", async () => {

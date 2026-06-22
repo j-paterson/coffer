@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Ctx } from "../ctx";
-import { normalizeCategory } from "../../../../packages/shared/categories";
+import { canonicalCategory } from "../../../../packages/shared/categories";
 
 const route = new Hono();
 
@@ -58,7 +58,7 @@ route.patch("/:id", async (c) => {
   if (hasCat) {
     normalizedCategory = body.category == null
       ? null
-      : normalizeCategory(body.category);
+      : canonicalCategory(body.category);
     // We set category_source='user' for both setting and clearing the category —
     // both are deliberate user actions, and we don't want auto-classification to
     // overwrite a user's null choice.
@@ -231,7 +231,7 @@ route.patch("/categories/bulk", async (c) => {
   const sets: string[] = [];
   const params: (string | number | null)[] = [];
   if (hasCat) {
-    const normalized = body.category == null ? null : normalizeCategory(body.category);
+    const normalized = body.category == null ? null : canonicalCategory(body.category);
     sets.push("category = ?", "category_source = 'user'");
     params.push(normalized);
   }
@@ -254,8 +254,8 @@ route.patch("/categories/bulk", async (c) => {
 route.patch("/categories/merge", async (c) => {
   const ctx = c.get("ctx") as Ctx;
   const body = await c.req.json<{ from: string; to: string }>();
-  const from = normalizeCategory(body.from);
-  const to = normalizeCategory(body.to);
+  const from = canonicalCategory(body.from);
+  const to = canonicalCategory(body.to);
   if (!from || !to || from === to) {
     return c.json({ error: "need distinct from and to" }, 400);
   }
