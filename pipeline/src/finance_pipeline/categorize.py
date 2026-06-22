@@ -339,6 +339,19 @@ def relink_transfer_counterparties(
                 ),
             )
 
+        # Repoint the loser's children before deleting it. postings cascade
+        # (ON DELETE CASCADE), but transaction_items and emails do not, so
+        # leaving them would violate their FK to transactions_v2. Mirror the
+        # dedup merge path.
+        conn.execute(
+            "UPDATE transaction_items SET transaction_v2_id = ? WHERE transaction_v2_id = ?",
+            (canonical, loser),
+        )
+        conn.execute(
+            "UPDATE emails SET transaction_v2_id = ? WHERE transaction_v2_id = ?",
+            (canonical, loser),
+        )
+
         conn.execute("DELETE FROM transactions_v2 WHERE id = ?", (loser,))
         relinked += 1
 
