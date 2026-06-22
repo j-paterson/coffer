@@ -1,0 +1,26 @@
+{
+  "name": "coffer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter '@coffer/server' dev & bun run --filter '@coffer/web' dev",
+    "build": "bun run --filter '*' build",
+    "typecheck": "bun run --filter '*' typecheck",
+    "test": "bun run --filter '*' test",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "screenshots": "bun run scripts/screenshots.ts"
+  },
+  "dependencies": {
+    "@coffer/config": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "typescript": "^5.9.3"
+  }
+}

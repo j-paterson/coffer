@@ -1,0 +1,61 @@
+{
+  "data": [
+    {
+      "id": "p-usdc-eth",
+      "type": "positions",
+      "attributes": {
+        "quantity": { "float": 1000, "numeric": "1000.0", "decimals": 6 },
+        "value": 1000.5,
+        "fungible_info": {
+          "symbol": "USDC",
+          "implementations": [
+            { "chain_id": "ethereum", "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", "decimals": 6 },
+            { "chain_id": "base",     "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", "decimals": 6 }
+          ]
+        }
+      },
+      "relationships": {
+        "chain":    { "data": { "id": "ethereum" } },
+        "fungible": { "data": { "id": "f-usdc" } }
+      }
+    },
+    {
+      "id": "p-eth-eth",
+      "type": "positions",
+      "attributes": {
+        "quantity": { "float": 1.5, "numeric": "1.5", "decimals": 18 },
+        "value": 3000.0,
+        "fungible_info": {
+          "symbol": "ETH",
+          "implementations": [
+            { "chain_id": "ethereum", "address": null, "decimals": 18 }
+          ]
+        }
+      },
+      "relationships": {
+        "chain":    { "data": { "id": "ethereum" } },
+        "fungible": { "data": { "id": "f-eth" } }
+      }
+    },
+    {
+      "id": "p-usdc-base",
+      "type": "positions",
+      "attributes": {
+        "quantity": { "float": 500, "numeric": "500.0", "decimals": 6 },
+        "value": 500.25,
+        "fungible_info": {
+          "symbol": "USDC",
+          "implementations": [
+            { "chain_id": "ethereum", "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", "decimals": 6 },
+            { "chain_id": "base",     "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", "decimals": 6 }
+          ]
+        }
+      },
+      "relationships": {
+        "chain":    { "data": { "id": "base" } },
+        "fungible": { "data": { "id": "f-usdc" } }
+      }
+    }
+  ],
+  "links": { "next": null }
+}

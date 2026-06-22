@@ -1,0 +1,27 @@
+import { defineConfig } from "@coffer/config";
+
+// Copy this file to finance.config.ts and customize.
+// See docs/parsers.md for per-parser config options.
+//
+// Required env vars (set in .env):
+//   SIMPLEFIN_ACCESS_URL  — from https://beta-bridge.simplefin.org
+//   ZERION_API_KEY        — from https://developers.zerion.io
+//   ALCHEMY_API_KEY       — from https://www.alchemy.com
+//   COINBASE_KEY_NAME     — from Coinbase Advanced Trade API
+//   COINBASE_PRIVATE_KEY  — from Coinbase Advanced Trade API
+
+export default defineConfig({
+  parsers: {
+    // Uncomment the parsers you want to enable:
+    // simplefin:     {},
+    // defillama:     {},
+    // zerion:        {},
+    // alchemy:       {},
+    // geckoterminal: {},
+    // coinbase:      {},
+    // email: {
+    //   fetcher: { backend: "gmail" },
+    //   extractor: { backend: "ollama" },
+    // },
+  },
+});

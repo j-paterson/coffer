@@ -1,0 +1,7 @@
+{
+  "data": [
+    { "id": "v2-eth-uuid", "name": "ETH Wallet", "currency": "ETH" },
+    { "id": "v2-btc-uuid", "name": "BTC Wallet", "currency": "BTC" }
+  ],
+  "pagination": { "next_uri": null }
+}

@@ -1,0 +1,7 @@
+{
+  "data": [
+    { "id": "base_0xaabbccddeeff00112233445566778899aabbccdd", "type": "pool", "attributes": { "reserve_in_usd": "1234567.89" } },
+    { "id": "base_0x1111222233334444555566667777888899990000", "type": "pool", "attributes": { "reserve_in_usd": "15500000" } },
+    { "id": "base_0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef", "type": "pool", "attributes": { "reserve_in_usd": "42000" } }
+  ]
+}

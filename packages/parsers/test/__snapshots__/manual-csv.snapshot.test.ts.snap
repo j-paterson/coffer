@@ -1,0 +1,173 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`manualCsvParser snapshot emits the expected op stream for the bank fixture 1`] = `
+[
+  {
+    "draft": {
+      "currency": "USD",
+      "display_name": "Northwind Checking",
+      "id": "manual:northwind-checking",
+      "institution": "Northwind Bank",
+      "mode": "manual",
+      "type": "checking",
+    },
+    "kind": "account_discovery",
+  },
+  {
+    "external_id": "be7c0dc4d8072db9",
+    "kind": "raw_event",
+    "payload": {
+      "amount": -32.5,
+      "currency": "USD",
+      "date": "2025-01-01",
+      "description": "Grocery store",
+      "file": "fixture",
+      "line": 1,
+    },
+    "source": "manual-csv",
+    "source_file": "fixture",
+  },
+  {
+    "draft": {
+      "account_id": "manual:northwind-checking",
+      "amount": -32.5,
+      "currency": "USD",
+      "date": "2025-01-01",
+      "derived_by": "manual-csv",
+      "description": "Grocery store",
+    },
+    "event_refs": [
+      {
+        "external_id": "be7c0dc4d8072db9",
+        "source": "manual-csv",
+      },
+    ],
+    "kind": "one_sided",
+  },
+  {
+    "external_id": "f5310e2b23ea9ed8",
+    "kind": "raw_event",
+    "payload": {
+      "amount": -58.2,
+      "currency": "USD",
+      "date": "2025-01-03",
+      "description": "Whole Foods, Market",
+      "file": "fixture",
+      "line": 2,
+    },
+    "source": "manual-csv",
+    "source_file": "fixture",
+  },
+  {
+    "draft": {
+      "account_id": "manual:northwind-checking",
+      "amount": -58.2,
+      "currency": "USD",
+      "date": "2025-01-03",
+      "derived_by": "manual-csv",
+      "description": "Whole Foods, Market",
+    },
+    "event_refs": [
+      {
+        "external_id": "f5310e2b23ea9ed8",
+        "source": "manual-csv",
+      },
+    ],
+    "kind": "one_sided",
+  },
+  {
+    "external_id": "9c5595632b098ac4",
+    "kind": "raw_event",
+    "payload": {
+      "amount": -4.75,
+      "currency": "USD",
+      "date": "2025-01-05",
+      "description": "Coffee shop",
+      "file": "fixture",
+      "line": 3,
+    },
+    "source": "manual-csv",
+    "source_file": "fixture",
+  },
+  {
+    "draft": {
+      "account_id": "manual:northwind-checking",
+      "amount": -4.75,
+      "currency": "USD",
+      "date": "2025-01-05",
+      "derived_by": "manual-csv",
+      "description": "Coffee shop",
+    },
+    "event_refs": [
+      {
+        "external_id": "9c5595632b098ac4",
+        "source": "manual-csv",
+      },
+    ],
+    "kind": "one_sided",
+  },
+  {
+    "external_id": "a8ae3843a8615401",
+    "kind": "raw_event",
+    "payload": {
+      "amount": -4.75,
+      "currency": "USD",
+      "date": "2025-01-05",
+      "description": "Coffee shop",
+      "file": "fixture",
+      "line": 4,
+    },
+    "source": "manual-csv",
+    "source_file": "fixture",
+  },
+  {
+    "draft": {
+      "account_id": "manual:northwind-checking",
+      "amount": -4.75,
+      "currency": "USD",
+      "date": "2025-01-05",
+      "derived_by": "manual-csv",
+      "description": "Coffee shop",
+    },
+    "event_refs": [
+      {
+        "external_id": "a8ae3843a8615401",
+        "source": "manual-csv",
+      },
+    ],
+    "kind": "one_sided",
+  },
+  {
+    "kind": "sync_warning",
+    "warning": {
+      "detail": {
+        "fields": [
+          "2025-01-06",
+          "Bad amount row",
+          "not-a-number",
+        ],
+        "line": 5,
+      },
+      "message": "skipped row 5: amount "not-a-number" is not numeric",
+      "scope": "fixture",
+      "source": "manual-csv",
+    },
+  },
+  {
+    "kind": "sync_warning",
+    "warning": {
+      "detail": {
+        "fields": [
+          "01/15/2025",
+          "Wrong format date",
+          "-10.00",
+        ],
+        "line": 6,
+      },
+      "message": "skipped row 6: parseDate: "01/15/2025" doesn't match YYYY-MM-DD",
+      "scope": "fixture",
+      "source": "manual-csv",
+    },
+  },
+]
+`;

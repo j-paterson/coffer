@@ -1,0 +1,219 @@
+# rules.example.yaml — categorization rules for `finance categorize`
+#
+# This is a committed example. Copy it to `pipeline/rules.yaml` (gitignored)
+# and customize for your real merchants.
+#
+# How rules work:
+#   - Rules are evaluated in priority order (lower number = higher priority).
+#   - Each rule has `when` (a list of conditions, AND'd together) and `then`
+#     (a list of actions). If all conditions match, the actions apply.
+#   - An action `{ stop: true }` halts further rule evaluation for that txn.
+#   - Without stop, multiple rules can stack actions (e.g., set category in
+#     one rule, add a tag in another).
+#
+# Supported condition operators:
+#   field=description: equals, contains, contains_any, starts_with, regex
+#   field=amount:      gt, gte, lt, lte
+#   field=account_id:  equals, contains
+#
+# Supported actions:
+#   { set: category, value: <category-name> }
+#   { set: subcategory, value: <name> }
+#   { add_tag: <name> }
+#   { stop: true }
+
+# Top-level categories. The categorize engine will warn if a rule references
+# a category not in this list — keeps the taxonomy from drifting.
+categories:
+  - Income
+  - Transfer
+  - Groceries
+  - Restaurants
+  - Coffee
+  - Gas
+  - Utilities
+  - Internet
+  - Subscriptions
+  - Software
+  - Healthcare
+  - Insurance
+  - Auto
+  - Travel
+  - Shopping
+  - Entertainment
+  - Fitness
+  - Pets
+  - Cash
+  - Fees
+  - Charity
+  - Personal
+  - Uncategorized
+
+rules:
+  # ============================================================
+  # Priority 1: Transfers (caught before any spending category)
+  # ============================================================
+  # Note: pair-based transfer detection runs as a separate pre-pass before
+  # rule evaluation; these rules are a fallback for cases where the pair's
+  # other side isn't in the DB (e.g., paying off a card you don't sync).
+
+  - name: credit-card-autopay
+    priority: 1
+    when:
+      - { field: description, op: contains_any, values: ["CREDIT CRD AUTOPAY", "AUTOMATIC PAYMENT", "ACH PMT"] }
+    then:
+      - { set: category, value: Transfer }
+      - { add_tag: autopay }
+      - { stop: true }
+
+  - name: internal-transfer
+    priority: 1
+    when:
+      - { field: description, op: regex, value: "^Online Transfer (to|from)" }
+    then:
+      - { set: category, value: Transfer }
+      - { stop: true }
+
+  # ============================================================
+  # Priority 5: Income
+  # ============================================================
+
+  - name: payroll
+    priority: 5
+    when:
+      - { field: description, op: contains, value: "PAYROLL" }
+      - { field: amount, op: gt, value: 0 }
+    then:
+      - { set: category, value: Income }
+      - { add_tag: payroll }
+      - { stop: true }
+
+  # Exchange withdrawals are your money moving from one wallet into
+  # spending, NOT income. Categorize as Transfer so the cashflow income
+  # detector doesn't inflate.
+  - name: exchange-withdrawal
+    priority: 5
+    when:
+      - { field: description, op: contains_any, values: ["Coinbase.com", "KRAKEN"] }
+      - { field: amount, op: gt, value: 0 }
+    then:
+      - { set: category, value: Transfer }
+      - { add_tag: crypto }
+      - { stop: true }
+
+  # ============================================================
+  # Priority 10: Bills, utilities, subscriptions, software
+  # ============================================================
+
+  - name: claude-ai
+    priority: 10
+    when:
+      - { field: description, op: contains, value: "CLAUDE.AI" }
+    then:
+      - { set: category, value: Software }
+      - { add_tag: subscription }
+
+  - name: apple-icloud
+    priority: 10
+    when:
+      - { field: description, op: equals, value: "APPLE.COM/BILL" }
+    then:
+      - { set: category, value: Software }
+      - { add_tag: subscription }
+
+  # ============================================================
+  # Priority 20: Specific merchants (groceries, food, healthcare)
+  # ============================================================
+
+  - name: costco
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "COSTCO" }
+    then:
+      - { set: category, value: Groceries }
+
+  - name: restaurants-toast
+    priority: 20
+    when:
+      - { field: description, op: regex, value: "^TST\\*" }
+    then:
+      - { set: category, value: Restaurants }
+
+  - name: doordash
+    priority: 20
+    when:
+      - { field: description, op: starts_with, value: "DD *DOORDASH" }
+    then:
+      - { set: category, value: Restaurants }
+      - { add_tag: delivery }
+
+  - name: chevron-gas
+    priority: 20
+    when:
+      - { field: description, op: contains, value: "CHEVRON" }
+    then:
+      - { set: category, value: Gas }
+
+  # ============================================================
+  # Priority 25: Amount-modified rules (must beat the generic Amazon rule)
+  # ============================================================
+
+  - name: amazon-large-purchase
+    priority: 25
+    when:
+      - { field: description, op: contains, value: "AMAZON" }
+      - { field: amount, op: lte, value: -200 }
+    then:
+      - { set: category, value: Shopping }
+      - { add_tag: large-purchase }
+
+  # ============================================================
+  # Priority 30: Generic merchant catch-alls
+  # ============================================================
+
+  - name: amazon
+    priority: 30
+    when:
+      - { field: description, op: contains_any, values: ["AMAZON MKTPL", "Amazon.com", "AMAZON MKTPLACE"] }
+    then:
+      - { set: category, value: Shopping }
+
+  # ============================================================
+  # Priority 50: Fees and cash (lowest priority — catch leftovers)
+  # ============================================================
+
+  - name: bank-fees
+    priority: 50
+    when:
+      - { field: description, op: contains_any, values: ["MONTHLY SERVICE FEE", "PURCHASE INTEREST CHARGE", "INTEREST CHARGE", "ANNUAL MEMBERSHIP FEE", "ATM FEE"] }
+    then:
+      - { set: category, value: Fees }
+
+  - name: atm
+    priority: 50
+    when:
+      - { field: description, op: contains, value: "ATM WITHDRAW" }
+    then:
+      - { set: category, value: Cash }
+
+  # ============================================================
+  # Priority 80: P2P (Venmo, Apple Cash) — uncategorizable from
+  # description alone, but at least bucket them so they don't pollute
+  # "Uncategorized". Tag with the source so they're easy to find later.
+  # ============================================================
+
+  - name: venmo
+    priority: 80
+    when:
+      - { field: description, op: starts_with, value: "VENMO PAYMENT" }
+    then:
+      - { set: category, value: Personal }
+      - { add_tag: venmo }
+
+  - name: apple-cash
+    priority: 80
+    when:
+      - { field: description, op: starts_with, value: "APPLE CASH SENT" }
+    then:
+      - { set: category, value: Personal }
+      - { add_tag: apple-cash }

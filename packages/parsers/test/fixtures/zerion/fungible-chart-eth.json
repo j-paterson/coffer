@@ -1,0 +1,15 @@
+{
+  "data": {
+    "attributes": {
+      "symbol": "ETH",
+      "implementations": [
+        { "chain_id": "ethereum", "address": null, "decimals": 18 }
+      ],
+      "points": [
+        [1700000000, 2000.0],
+        [1700604800, 2100.0],
+        [1701209600, 2050.5]
+      ]
+    }
+  }
+}

@@ -1,0 +1,379 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`simpleFinParser snapshot emits the expected op stream for the single-window fixture 1`] = `
+[
+  {
+    "draft": {
+      "currency": "USD",
+      "display_name": "Brokerage",
+      "external_id": "brk-301",
+      "id": "simplefin:brk-301",
+      "institution": "Fidelity",
+      "mode": "live",
+      "source": "simplefin",
+      "type": "brokerage",
+    },
+    "kind": "account_discovery",
+  },
+  {
+    "external_id": "simplefin:brk-301:balance:2026-05-01",
+    "kind": "raw_event",
+    "payload": {
+      "account_id": "brk-301",
+      "as_of": "2026-05-01",
+      "balance": "12500.00",
+      "currency": "USD",
+    },
+    "source": "simplefin",
+  },
+  {
+    "draft": {
+      "account_id": "simplefin:brk-301",
+      "as_of": "2026-05-01",
+      "expected_usd": 12500,
+      "source": "simplefin",
+    },
+    "event_refs": [
+      {
+        "external_id": "simplefin:brk-301:balance:2026-05-01",
+        "source": "simplefin",
+      },
+    ],
+    "kind": "assertion",
+  },
+  {
+    "external_id": "simplefin:brk-301:x-001",
+    "kind": "raw_event",
+    "payload": {
+      "account_id": "brk-301",
+      "amount": "-500.00",
+      "description": "Buy VTI",
+      "id": "x-001",
+      "pending": false,
+      "posted": 1714521600,
+    },
+    "source": "simplefin",
+  },
+  {
+    "draft": {
+      "account_id": "simplefin:brk-301",
+      "amount": -500,
+      "currency": "USD",
+      "date": "2024-05-01",
+      "derived_by": "simplefin",
+      "description": "Buy VTI",
+    },
+    "event_refs": [
+      {
+        "external_id": "simplefin:brk-301:x-001",
+        "source": "simplefin",
+      },
+    ],
+    "kind": "one_sided",
+  },
+  {
+    "external_id": "simplefin:brk-301:hold:BND:2026-05-01",
+    "kind": "raw_event",
+    "payload": {
+      "account_id": "brk-301",
+      "as_of": "2026-05-01",
+      "cost_basis": "1000.00",
+      "currency": "USD",
+      "description": "Vanguard Total Bond",
+      "market_value": "1000.00",
+      "shares": "10",
+      "symbol": "BND",
+    },
+    "source": "simplefin",
+  },
+  {
+    "draft": {
+      "account_id": "simplefin:brk-301",
+      "as_of": "2026-05-01",
+      "chain": null,
+      "contract_address": null,
+      "price_usd": 100,
+      "qty": 10,
+      "source": "simplefin",
+      "symbol": "BND",
+    },
+    "event_refs": [
+      {
+        "external_id": "simplefin:brk-301:hold:BND:2026-05-01",
+        "source": "simplefin",
+      },
+    ],
+    "kind": "position_snapshot",
+  },
+  {
+    "external_id": "simplefin:brk-301:hold:VTI:2026-05-01",
+    "kind": "raw_event",
+    "payload": {
+      "account_id": "brk-301",
+      "as_of": "2026-05-01",
+      "cost_basis": "10000.00",
+      "currency": "USD",
+      "description": "Vanguard Total Stock",
+      "market_value": "11500.00",
+      "shares": "50",
+      "symbol": "VTI",
+    },
+    "source": "simplefin",
+  },
+  {
+    "draft": {
+      "account_id": "simplefin:brk-301",
+      "as_of": "2026-05-01",
+      "chain": null,
+      "contract_address": null,
+      "price_usd": 230,
+      "qty": 50,
+      "source": "simplefin",
+      "symbol": "VTI",
+    },
+    "event_refs": [
+      {
+        "external_id": "simplefin:brk-301:hold:VTI:2026-05-01",
+        "source": "simplefin",
+      },
+    ],
+    "kind": "position_snapshot",
+  },
+  {
+    "draft": {
+      "currency": "USD",
+      "display_name": "Sapphire Card",
+      "external_id": "cc-101",
+      "id": "simplefin:cc-101",
+      "institution": "Northwind Bank",
+      "mode": "live",
+      "source": "simplefin",
+      "type": "credit",
+    },
+    "kind": "account_discovery",
+  },
+  {
+    "external_id": "simplefin:cc-101:balance:2026-05-01",
+    "kind": "raw_event",
+    "payload": {
+      "account_id": "cc-101",
+      "as_of": "2026-05-01",
+      "balance": "-742.10",
+      "currency": "USD",
+    },
+    "source": "simplefin",
+  },
+  {
+    "draft": {
+      "account_id": "simplefin:cc-101",
+      "as_of": "2026-05-01",
+      "expected_usd": -742.1,
+      "source": "simplefin",
+    },
+    "event_refs": [
+      {
+        "external_id": "simplefin:cc-101:balance:2026-05-01",
+        "source": "simplefin",
+      },
+    ],
+    "kind": "assertion",
+  },
+  {
+    "external_id": "simplefin:cc-101:c-001",
+    "kind": "raw_event",
+    "payload": {
+      "account_id": "cc-101",
+      "amount": "-45.00",
+      "description": "Restaurant",
+      "id": "c-001",
+      "pending": false,
+      "posted": 1714521600,
+    },
+    "source": "simplefin",
+  },
+  {
+    "draft": {
+      "account_id": "simplefin:cc-101",
+      "amount": -45,
+      "currency": "USD",
+      "date": "2024-05-01",
+      "derived_by": "simplefin",
+      "description": "Restaurant",
+    },
+    "event_refs": [
+      {
+        "external_id": "simplefin:cc-101:c-001",
+        "source": "simplefin",
+      },
+    ],
+    "kind": "one_sided",
+  },
+  {
+    "external_id": "simplefin:cc-101:c-002",
+    "kind": "raw_event",
+    "payload": {
+      "account_id": "cc-101",
+      "amount": "-120.00",
+      "description": "Flight",
+      "id": "c-002",
+      "pending": false,
+      "posted": 1714608000,
+    },
+    "source": "simplefin",
+  },
+  {
+    "draft": {
+      "account_id": "simplefin:cc-101",
+      "amount": -120,
+      "currency": "USD",
+      "date": "2024-05-02",
+      "derived_by": "simplefin",
+      "description": "Flight",
+    },
+    "event_refs": [
+      {
+        "external_id": "simplefin:cc-101:c-002",
+        "source": "simplefin",
+      },
+    ],
+    "kind": "one_sided",
+  },
+  {
+    "draft": {
+      "currency": "USD",
+      "display_name": "Joint Checking",
+      "external_id": "chk-001",
+      "id": "simplefin:chk-001",
+      "institution": "Northwind Bank",
+      "mode": "live",
+      "source": "simplefin",
+      "type": "checking",
+    },
+    "kind": "account_discovery",
+  },
+  {
+    "external_id": "simplefin:chk-001:balance:2026-05-01",
+    "kind": "raw_event",
+    "payload": {
+      "account_id": "chk-001",
+      "as_of": "2026-05-01",
+      "balance": "4231.78",
+      "currency": "USD",
+    },
+    "source": "simplefin",
+  },
+  {
+    "draft": {
+      "account_id": "simplefin:chk-001",
+      "as_of": "2026-05-01",
+      "expected_usd": 4231.78,
+      "source": "simplefin",
+    },
+    "event_refs": [
+      {
+        "external_id": "simplefin:chk-001:balance:2026-05-01",
+        "source": "simplefin",
+      },
+    ],
+    "kind": "assertion",
+  },
+  {
+    "external_id": "simplefin:chk-001:t-001",
+    "kind": "raw_event",
+    "payload": {
+      "account_id": "chk-001",
+      "amount": "-87.43",
+      "description": "Whole Foods",
+      "id": "t-001",
+      "pending": false,
+      "posted": 1714521600,
+    },
+    "source": "simplefin",
+  },
+  {
+    "draft": {
+      "account_id": "simplefin:chk-001",
+      "amount": -87.43,
+      "currency": "USD",
+      "date": "2024-05-01",
+      "derived_by": "simplefin",
+      "description": "Whole Foods",
+    },
+    "event_refs": [
+      {
+        "external_id": "simplefin:chk-001:t-001",
+        "source": "simplefin",
+      },
+    ],
+    "kind": "one_sided",
+  },
+  {
+    "external_id": "simplefin:chk-001:t-002",
+    "kind": "raw_event",
+    "payload": {
+      "account_id": "chk-001",
+      "amount": "1500.00",
+      "description": "Paycheck",
+      "id": "t-002",
+      "pending": false,
+      "posted": 1714608000,
+    },
+    "source": "simplefin",
+  },
+  {
+    "draft": {
+      "account_id": "simplefin:chk-001",
+      "amount": 1500,
+      "currency": "USD",
+      "date": "2024-05-02",
+      "derived_by": "simplefin",
+      "description": "Paycheck",
+    },
+    "event_refs": [
+      {
+        "external_id": "simplefin:chk-001:t-002",
+        "source": "simplefin",
+      },
+    ],
+    "kind": "one_sided",
+  },
+  {
+    "external_id": "simplefin:chk-001:t-003",
+    "kind": "raw_event",
+    "payload": {
+      "account_id": "chk-001",
+      "amount": "-12.99",
+      "description": "Spotify",
+      "id": "t-003",
+      "pending": false,
+      "posted": 1714694400,
+    },
+    "source": "simplefin",
+  },
+  {
+    "draft": {
+      "account_id": "simplefin:chk-001",
+      "amount": -12.99,
+      "currency": "USD",
+      "date": "2024-05-03",
+      "derived_by": "simplefin",
+      "description": "Spotify",
+    },
+    "event_refs": [
+      {
+        "external_id": "simplefin:chk-001:t-003",
+        "source": "simplefin",
+      },
+    ],
+    "kind": "one_sided",
+  },
+  {
+    "kind": "sync_warning",
+    "warning": {
+      "message": "bank login failed for example-bank-x",
+      "scope": "errlist",
+      "source": "simplefin",
+    },
+  },
+]
+`;

@@ -1,0 +1,24 @@
+{
+  "accounts": [
+    {
+      "id": "chk-001",
+      "name": "Joint Checking (old name)",
+      "currency": "USD",
+      "balance": "4000.00",
+      "org": { "name": "Northwind Bank", "domain": "northwindbank.com" },
+      "transactions": [
+        { "id": "old-only", "posted": 1712000000, "amount": "100.00", "description": "Only in old window" },
+        { "id": "shared",   "posted": 1713000000, "amount": "-50.00", "description": "Shared (older version)" }
+      ]
+    },
+    {
+      "id": "stale-acct",
+      "name": "Closed Account",
+      "currency": "USD",
+      "balance": "0.00",
+      "org": { "name": "Wells Fargo", "domain": "wellsfargo.com" },
+      "transactions": []
+    }
+  ],
+  "errlist": ["error A", "shared error"]
+}

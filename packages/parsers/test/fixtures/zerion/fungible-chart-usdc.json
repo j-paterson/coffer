@@ -1,0 +1,16 @@
+{
+  "data": {
+    "attributes": {
+      "symbol": "USDC",
+      "implementations": [
+        { "chain_id": "ethereum", "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", "decimals": 6 },
+        { "chain_id": "base",     "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", "decimals": 6 }
+      ],
+      "points": [
+        [1700000000, 1.0001],
+        [1700604800, 1.0002],
+        [1701209600, 0.9998]
+      ]
+    }
+  }
+}

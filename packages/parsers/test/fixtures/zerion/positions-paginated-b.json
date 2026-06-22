@@ -1,0 +1,21 @@
+{
+  "data": [
+    {
+      "id": "p-btc",
+      "type": "positions",
+      "attributes": {
+        "quantity": { "float": 0.1, "numeric": "0.1", "decimals": 8 },
+        "value": 4000.0,
+        "fungible_info": {
+          "symbol": "WBTC",
+          "implementations": [{ "chain_id": "ethereum", "address": "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599", "decimals": 8 }]
+        }
+      },
+      "relationships": {
+        "chain":    { "data": { "id": "ethereum" } },
+        "fungible": { "data": { "id": "f-wbtc" } }
+      }
+    }
+  ],
+  "links": { "next": null }
+}

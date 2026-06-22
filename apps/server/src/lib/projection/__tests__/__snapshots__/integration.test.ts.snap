@@ -1,0 +1,7 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`canonical scenario produces stable summary (snapshot) 1`] = `12493116`;
+
+exports[`canonical scenario produces stable summary (snapshot) 2`] = `-132645`;
+
+exports[`canonical scenario produces stable summary (snapshot) 3`] = `0.0654`;
