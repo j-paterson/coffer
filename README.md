@@ -54,6 +54,30 @@ provider. You can also manage providers anytime from the Settings page.
 Edit `finance.config.ts` to enable parsers.
 API keys live in `.env`. See `.env.example` for the full list.
 
+### Running your own instance (dog-fooding)
+
+Your real data never belongs in the repo. To keep development and your own
+live instance cleanly separated:
+
+- **Relocate the database** outside the working tree with `FINANCE_DB`:
+  ```bash
+  FINANCE_DB=~/coffer-data/finance.sqlite bun run dev
+  ```
+  (or put `FINANCE_DB=...` in `.env`). The server and CLI both honor it, so
+  your real DB, secrets, and provider connections live in `~/coffer-data/`,
+  not in the checkout. The recommended layout is **two clones**: one for
+  development (generic, where you commit) and one you only `git pull` into
+  for live use against your own data.
+- **Install the commit guard** in each clone so private data can't slip into
+  a commit:
+  ```bash
+  bash scripts/install-guard.sh
+  ```
+  Then create a gitignored `.guard-denylist` (one regex per line) with your
+  real institution names, wallet addresses, and email. The guard blocks any
+  commit that stages a `*.sqlite`/`.env`/`*.bak` file or whose diff contains
+  a denylisted pattern.
+
 ## CLI
 
 The dashboard's sync button invokes the same CLI under the hood. To run a

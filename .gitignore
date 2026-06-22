@@ -21,6 +21,9 @@ db/*.sqlite.bak
 backups/
 raw/
 
+# Private pre-commit guard denylist (see scripts/install-guard.sh)
+.guard-denylist
+
 # Node / Bun / Next
 node_modules/
 .next/
