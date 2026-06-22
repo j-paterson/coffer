@@ -510,7 +510,77 @@ export function Spending() {
                 </span>
               )}
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                setMergeFrom(selectedCategory);
+                setMergeTarget("");
+              }}
+              className="text-xs text-stone-500 hover:text-stone-700"
+            >
+              Rename
+            </button>
           </header>
+          {mergeFrom && (
+            <div className="flex items-center gap-2 border-b border-stone-100 bg-violet-50/50 px-4 py-2 text-xs">
+              <span className="text-stone-600">
+                {mergeFrom === selectedCategory ? "Rename" : "Merge"}{" "}
+                <strong>{formatCategory(mergeFrom)}</strong>{" "}
+                {mergeFrom === selectedCategory ? "to" : "into"}:
+              </span>
+              <input
+                type="text"
+                value={mergeTarget}
+                onChange={(e) => setMergeTarget(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key === "Enter" && mergeTarget.trim()) {
+                    // A top-category rename retargets every item in the
+                    // category (the backend updates category globally), so the
+                    // old name disappears — navigate back to all categories.
+                    // A subcategory merge stays put and just refetches.
+                    const isCategoryRename = mergeFrom === selectedCategory;
+                    setMerging(true);
+                    try {
+                      const result = await mergeMut.mutateAsync({
+                        from: mergeFrom,
+                        to: mergeTarget,
+                      });
+                      if (isCategoryRename) {
+                        navigate("/spending");
+                      } else {
+                        refetchCategoryTxns(selectedCategory!);
+                      }
+                      alert(`Updated ${result.items_updated} items`);
+                    } catch (err) {
+                      alert(`Rename failed: ${err}`);
+                    } finally {
+                      setMerging(false);
+                      setMergeFrom(null);
+                      setMergeTarget("");
+                    }
+                  }
+                  if (e.key === "Escape") {
+                    setMergeFrom(null);
+                    setMergeTarget("");
+                  }
+                }}
+                disabled={merging}
+                className="w-36 rounded border border-stone-300 px-1.5 py-0.5 outline-none focus:border-violet-400"
+                placeholder="category name"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setMergeFrom(null);
+                  setMergeTarget("");
+                }}
+                className="text-stone-400 hover:text-stone-700"
+              >
+                ✕
+              </button>
+            </div>
+          )}
           <div className="px-4 py-4">
             {itemsByCat == null ? (
               <p className="text-sm text-stone-500">loading subcategories…</p>
@@ -532,59 +602,6 @@ export function Spending() {
                   setMergeTarget("");
                 }}
               />
-              {mergeFrom && (
-                <div className="mt-2 flex items-center gap-2 rounded-md border border-violet-200 bg-violet-50/50 px-3 py-2 text-xs">
-                  <span className="text-stone-600">
-                    Merge <strong>{formatCategory(mergeFrom)}</strong> into:
-                  </span>
-                  <input
-                    type="text"
-                    value={mergeTarget}
-                    onChange={(e) => setMergeTarget(e.target.value)}
-                    onKeyDown={async (e) => {
-                      if (e.key === "Enter" && mergeTarget.trim()) {
-                        setMerging(true);
-                        try {
-                          const result = await mergeMut.mutateAsync({
-                            from: mergeFrom,
-                            to: mergeTarget,
-                          });
-                          // mergeMut invalidates spending-items-by-category
-                          // and spending-transactions, so the queries refetch
-                          // automatically. Manually refresh the per-category
-                          // txn cache for the open drilldown.
-                          refetchCategoryTxns(selectedCategory!);
-                          alert(`Merged ${result.items_updated} items`);
-                        } catch (err) {
-                          alert(`Merge failed: ${err}`);
-                        } finally {
-                          setMerging(false);
-                          setMergeFrom(null);
-                          setMergeTarget("");
-                        }
-                      }
-                      if (e.key === "Escape") {
-                        setMergeFrom(null);
-                        setMergeTarget("");
-                      }
-                    }}
-                    disabled={merging}
-                    className="w-28 rounded border border-stone-300 px-1.5 py-0.5 outline-none focus:border-violet-400"
-                    placeholder="target category"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMergeFrom(null);
-                      setMergeTarget("");
-                    }}
-                    className="text-stone-400 hover:text-stone-700"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
               </>
             )}
           </div>
