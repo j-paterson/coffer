@@ -68,6 +68,13 @@ live instance cleanly separated:
   not in the checkout. The recommended layout is **two clones**: one for
   development (generic, where you commit) and one you only `git pull` into
   for live use against your own data.
+- **Run both at once** by giving the live instance its own ports. The web
+  (`WEB_PORT`), API (`PORT`), and proxy target are env-configurable:
+  ```bash
+  # in ~/coffer-data/.env, for the live instance
+  PORT=3011
+  WEB_PORT=5183
+  ```
 - **Install the commit guard** in each clone so private data can't slip into
   a commit:
   ```bash
