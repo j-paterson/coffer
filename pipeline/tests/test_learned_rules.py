@@ -8,7 +8,7 @@ apply_learned_rules closes that gap.
 """
 from __future__ import annotations
 
-from finance_pipeline.categorize import apply_learned_rules
+from finance_pipeline.categorize import apply_learned_rules, canonical_category
 
 
 def _learn(conn, keyword, category, hits=1):
@@ -94,6 +94,39 @@ def test_higher_hit_keyword_wins_conflict(conn, seed_txn):
         "SELECT category FROM transaction_items WHERE transaction_v2_id = ?",
         (tid,),
     ).fetchone()["category"] == "Groceries"
+
+
+def test_canonical_category_normalizes_case_and_legacy():
+    # case-only
+    assert canonical_category("restaurants") == "Restaurants"
+    assert canonical_category("SHOPPING") == "Shopping"
+    # legacy aliases → canonical bucket (matches migration 053)
+    assert canonical_category("grocery") == "Groceries"
+    assert canonical_category("vehicle") == "Auto"
+    assert canonical_category("debt_payment") == "Transfer"
+    # already canonical is stable
+    assert canonical_category("Restaurants") == "Restaurants"
+    # empty/None
+    assert canonical_category(None) is None
+    assert canonical_category("   ") is None
+
+
+def test_learned_lowercase_category_is_stored_canonical(conn, seed_txn):
+    # user_item_rules carries the old app's lowercase value; the applied
+    # category must be canonical so it doesn't split the Spending bucket.
+    _learn(conn, "hopdoddy", "restaurants")
+    tid = seed_txn(
+        date="2026-01-01",
+        description="HOPDODDY BURGER BAR",
+        postings=[("checking:x", -15.0), ("equity:unknown-counterparty", 15.0)],
+        item_category=None,
+    )
+    conn.commit()
+    apply_learned_rules(conn)
+    assert conn.execute(
+        "SELECT category FROM transaction_items WHERE transaction_v2_id = ?",
+        (tid,),
+    ).fetchone()["category"] == "Restaurants"
 
 
 def test_dry_run_counts_without_writing(conn, seed_txn):

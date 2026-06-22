@@ -29,6 +29,52 @@ import yaml
 from . import db
 from .config import RULES_PATH
 
+# Canonical Title Case spending categories + legacy aliases, mirroring the
+# values declared in rules.yaml and the one-time normalization in migration
+# 053. Storage must be a single canonical form per category so the Spending
+# page's `GROUP BY i.category` collapses variants into one bucket (the UI
+# title-cases for display, so "Restaurants" and "restaurants" otherwise show
+# as two identical-looking rows). Keys are lowercased before lookup.
+_CATEGORY_CANON: dict[str, str] = {
+    # case-only normalization
+    "auto": "Auto", "cash": "Cash", "charity": "Charity", "coffee": "Coffee",
+    "entertainment": "Entertainment", "fees": "Fees", "fitness": "Fitness",
+    "gas": "Gas", "groceries": "Groceries", "healthcare": "Healthcare",
+    "income": "Income", "insurance": "Insurance", "internet": "Internet",
+    "pets": "Pets", "personal": "Personal", "restaurants": "Restaurants",
+    "shopping": "Shopping", "software": "Software", "subscriptions": "Subscriptions",
+    "taxes": "Taxes", "transfer": "Transfer", "travel": "Travel",
+    "utilities": "Utilities", "uncategorized": "Uncategorized",
+    # legacy fine-grained → canonical bucket (matches migration 053)
+    "grocery": "Groceries", "automotive": "Auto", "vehicle": "Auto",
+    "transportation": "Auto", "credit_interest": "Fees", "investment_loss": "Fees",
+    "personal_care": "Personal", "drinks": "Restaurants", "snacks": "Restaurants",
+    "accessories": "Shopping", "clothing": "Shopping", "electronics": "Shopping",
+    "home_appliance": "Shopping", "home_appliance_cleaning": "Shopping",
+    "home_decoration": "Shopping", "home_furniture": "Shopping",
+    "home_hardware": "Shopping", "home_lighting": "Shopping",
+    "home_renovation": "Shopping", "labor": "Shopping", "materials": "Shopping",
+    "mixed": "Shopping", "outdoors": "Entertainment", "debt_payment": "Transfer",
+    "travel_accessories": "Travel", "unknown": "Uncategorized", "crypto": "Transfer",
+}
+
+
+def canonical_category(value: str | None) -> str | None:
+    """Coerce a category string to its canonical Title Case storage form.
+
+    Known case-variants and legacy aliases map via _CATEGORY_CANON; anything
+    else falls back to capitalizing the first letter (single-token default).
+    """
+    if value is None:
+        return None
+    key = value.strip().lower()
+    if not key:
+        return None
+    if key in _CATEGORY_CANON:
+        return _CATEGORY_CANON[key]
+    stripped = value.strip()
+    return stripped[:1].upper() + stripped[1:].lower()
+
 
 @dataclass
 class Condition:
@@ -404,7 +450,8 @@ def apply_learned_rules(conn: sqlite3.Connection, dry_run: bool = False) -> int:
     applied = 0
     for row in learned:
         keyword = (row["keyword"] or "").strip().lower()
-        if not keyword:
+        category = canonical_category(row["category"])
+        if not keyword or not category:
             continue
         like = f"%{keyword}%"
         if dry_run:
@@ -416,7 +463,7 @@ def apply_learned_rules(conn: sqlite3.Connection, dry_run: bool = False) -> int:
         cur = conn.execute(
             f"UPDATE transaction_items "
             f"SET category = ?, category_source = 'learned' WHERE {guard}",
-            (row["category"], like),
+            (category, like),
         )
         applied += cur.rowcount or 0
     return applied
