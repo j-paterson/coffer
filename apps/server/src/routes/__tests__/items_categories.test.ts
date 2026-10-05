@@ -422,3 +422,25 @@ test("PATCH /:id/kind route no longer exists (404 from router)", async () => {
   // Hono returns 404 when no matching route exists
   expect(res.status).toBe(404);
 });
+
+test("PATCH /api/items/:id never learns bank-memo noise as the keyword", async () => {
+  const info = db.prepare(
+    `INSERT INTO transaction_items (name, line_total, line_no)
+     VALUES ('Online Transfer to CHK ...1234 transaction#: 5551234', -100, 1)`,
+  ).run();
+  // "transaction" is longer than "transfer" but would also catch "Transaction Fee".
+  db.prepare(
+    `INSERT INTO transaction_items (name, line_total, line_no) VALUES ('Transaction Fee', -12, 1)`,
+  ).run();
+
+  const res = await makeApp(db).request(`/api/items/${info.lastInsertRowid}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ category: "Transfer" }),
+  });
+  const body = await res.json() as { keyword_learned: string | null };
+
+  expect(body.keyword_learned).toBe("transfer");
+  const fee = db.prepare(`SELECT category FROM transaction_items WHERE name = 'Transaction Fee'`).get() as { category: string | null };
+  expect(fee.category).toBeNull();
+});

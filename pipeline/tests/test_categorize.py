@@ -223,3 +223,28 @@ def test_categorize_does_not_clobber_existing_item_category(
     ).fetchone()
     assert row["category"] == "shopping"
     assert row["category_source"] == "user"
+
+
+def test_categorize_fills_every_blank_receipt_line(conn, seed_txn, tmp_path):
+    tid = seed_txn(
+        date="2026-04-01",
+        description="UBER EATS order",
+        postings=[("acct:northwind", -25), ("equity:unknown-counterparty", 25)],
+    )
+    # Receipt-itemized: the placeholder was replaced by two lines, one of
+    # which the receipt pass already categorized.
+    conn.execute("DELETE FROM transaction_items WHERE transaction_v2_id = ?", (tid,))
+    for n, cat in ((1, "restaurants"), (2, "groceries"), (3, None), (4, None)):
+        conn.execute(
+            "INSERT INTO transaction_items (transaction_v2_id, line_no, name, "
+            "line_total, category) VALUES (?, ?, 'x', -5, ?)",
+            (tid, n, cat),
+        )
+    ruleset = load_rules(_write_rules(tmp_path, _UBER_RULES))
+    _run_categorize(conn, ruleset, dry_run=False, only_uncategorized=False)
+
+    cats = [r[0] for r in conn.execute(
+        "SELECT category FROM transaction_items WHERE transaction_v2_id = ? "
+        "ORDER BY line_no", (tid,))]
+    # Line 1 already agrees with the rule; the blanks still get filled.
+    assert cats == ["restaurants", "groceries", "restaurants", "restaurants"]

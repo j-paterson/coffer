@@ -291,6 +291,14 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
         if args.dry_run:
             print("\n(dry-run — no changes written)")
         return 0
+    if sub == "items":
+        from . import receipt_items as _ri
+        with _db.connect() as conn:
+            stats = _ri.normalize_receipt_items(conn, dry_run=args.dry_run)
+        _ri.print_report(stats)
+        if args.dry_run:
+            print("\n(dry-run — no changes written)")
+        return 0
     print(f"unknown reconcile action: {sub}")
     return 1
 
@@ -818,6 +826,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print pairs without tagging",
     )
     p_rc_t.set_defaults(func=cmd_reconcile)
+    p_rc_i = rc_sub.add_parser(
+        "items",
+        help="Make receipt line items sum to their txn and drop placeholder items",
+    )
+    p_rc_i.add_argument(
+        "--dry-run", action="store_true",
+        help="Count txns that would change without writing",
+    )
+    p_rc_i.set_defaults(func=cmd_reconcile)
 
     p_acct = sub.add_parser(
         "accounts", help="Account-level operations (merge, list, suggest)"

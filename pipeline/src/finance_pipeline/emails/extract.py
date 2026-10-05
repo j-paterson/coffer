@@ -41,6 +41,7 @@ from .extractors.ollama import (
 )
 from .interfaces import EmailContent, ExtractedReceipt, ReceiptExtractor
 from .sender_parsers import try_sender_parsers
+from ..receipt_items import normalize_receipt_items
 
 
 @dataclass
@@ -255,17 +256,29 @@ def _write_extraction(
         1 for it in items if isinstance(it, dict) and _parse_amount(it.get("line_total")) is not None
     )
     if txn_v2_id is not None:
-        existing = conn.execute(
-            """
-            SELECT email_id, COUNT(*) AS n, SUM(line_total IS NOT NULL) AS non_null
-            FROM transaction_items
-            WHERE transaction_v2_id = ? AND email_id != ?
-            GROUP BY email_id
-            ORDER BY non_null DESC, n DESC
-            LIMIT 1
-            """,
+        # Judge the competing email by what its receipt said (`raw`), not by
+        # line_total: normalize_receipt_items fills every line_total in.
+        competing: dict[str, list[int]] = {}
+        for other_id, other_raw, other_total in conn.execute(
+            "SELECT email_id, raw, line_total FROM transaction_items "
+            "WHERE transaction_v2_id = ? AND email_id != ?",
             (txn_v2_id, email_id),
-        ).fetchone()
+        ):
+            try:
+                parsed = json.loads(other_raw) if other_raw else None
+            except ValueError:
+                parsed = None
+            if isinstance(parsed, dict):
+                priced = _parse_amount(parsed.get("line_total")) is not None
+            else:
+                priced = other_total is not None
+            tally = competing.setdefault(other_id, [0, 0])
+            tally[0] += int(priced)
+            tally[1] += 1
+        existing = (
+            max(((k, v[1], v[0]) for k, v in competing.items()), key=lambda e: (e[2], e[1]))
+            if competing else None
+        )
         if existing is not None:
             existing_quality = existing[2] or 0
             if new_quality > existing_quality:
@@ -499,6 +512,9 @@ def extract_pending(
                 )
 
             conn.commit()
+        # Re-extraction writes lines straight onto an already-matched txn.
+        normalize_receipt_items(conn)
+        conn.commit()
     return stats
 
 

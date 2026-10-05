@@ -209,6 +209,7 @@ def _apply_actions(
             return True
         if action.kind == "set":
             state[action.target] = action.value
+            state.setdefault("set_fields", set()).add(action.target)
         elif action.kind == "add_tag":
             state["tags"].add(action.value)
     return False
@@ -558,19 +559,18 @@ def _run_categorize(
                 tags_csv = (
                     ",".join(sorted(state["tags"])) if state["tags"] else None
                 )
-                if state["category"] is not None:
-                    # COALESCE(category, ?) preserves any pre-existing item
-                    # category (receipt-derived or user-set). The rules pass
-                    # only fills in blanks, never clobbers richer provenance.
+                if state["category"] is not None and "category" in state.get("set_fields", ()):
+                    # Fill every blank item on the txn (a receipt-itemized txn
+                    # has several, and no placeholder) with the category a rule
+                    # set. Never clobbers receipt or user categories, and a
+                    # tags-only rule doesn't copy line 1's category around.
                     conn.execute(
                         """
                         UPDATE transaction_items
-                           SET category = COALESCE(category, ?),
+                           SET category = ?,
                                category_source = COALESCE(category_source, 'rule')
-                         WHERE id = (
-                           SELECT MIN(id) FROM transaction_items
-                           WHERE transaction_v2_id = ?
-                         )
+                         WHERE transaction_v2_id = ? AND category IS NULL
+                           AND COALESCE(category_source, '') != 'user'
                         """,
                         (state["category"], txn["id"]),
                     )

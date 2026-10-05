@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
 from ..db import connect
+from ..receipt_items import normalize_receipt_items
 
 
 STRICT_AMOUNT_DELTA = 0.05
@@ -283,6 +284,10 @@ def match_all(refresh: bool = False) -> MatchStats:
                 f"{best['date']} {best['amount']:.2f} "
                 f"{best['payee'] or (best['description'] or '')[:30]}"
             )
+
+        # Attaching receipt lines leaves the txn's placeholder item in place and
+        # the lines in the extractor's sign; reconcile so totals count once.
+        normalize_receipt_items(conn)
 
     return stats
 

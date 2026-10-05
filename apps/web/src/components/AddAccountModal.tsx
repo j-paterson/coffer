@@ -1,4 +1,5 @@
 // apps/web/src/components/AddAccountModal.tsx
+import { localIsoDate } from "../lib/format";
 import { useState } from "react";
 import {
   ACCOUNT_CATEGORIES,
@@ -18,7 +19,7 @@ interface Props {
   onCancel: () => void;
 }
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayISO = () => localIsoDate();
 
 export function AddAccountModal({ pending, onSubmit, onCancel }: Props) {
   const [name, setName] = useState("");

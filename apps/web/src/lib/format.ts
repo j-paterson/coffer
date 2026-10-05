@@ -14,15 +14,26 @@ export function formatUsd(n: number | null | undefined, cents = false): string {
   return (cents ? USD_CENTS : USD).format(n);
 }
 
+const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 export function formatDate(iso: string | null): string {
   if (!iso) return "—";
-  const d = new Date(iso);
+  // A bare YYYY-MM-DD is a calendar day. new Date() would read it as midnight UTC,
+  // which renders as the previous day anywhere west of Greenwich.
+  const m = DATE_ONLY.exec(iso);
+  const d = m ? new Date(+m[1]!, +m[2]! - 1, +m[3]!) : new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
+}
+
+/** YYYY-MM-DD for the local calendar day (toISOString() gives the UTC day). */
+export function localIsoDate(d: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /** Format a crypto/asset quantity with adaptive decimal precision.

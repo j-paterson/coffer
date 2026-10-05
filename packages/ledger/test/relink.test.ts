@@ -154,6 +154,18 @@ describe("planRelink / applyRelinkPlan", () => {
     expect(count("SELECT excluded_from_spending n FROM transactions_v2 WHERE id = ?", keep)).toBe(1);
   });
 
+  test("a user category reaches a receipt-itemized keeper that has no placeholder", () => {
+    const keep = txn("old-card", "2026-09-10", -20, "CAFE");
+    const dup = txn("new-card", "2026-09-10", -20, "CAFE");
+    // Keeper itemized by a receipt: its placeholder was replaced by the lines.
+    db.query("INSERT INTO emails (id, received_at, from_addr, subject, raw_path) VALUES ('m3', '2026-09-10', 'a@example.com', 'Receipt', 'z.eml')").run();
+    db.query("DELETE FROM transaction_items WHERE transaction_v2_id = ?").run(keep);
+    db.query("INSERT INTO transaction_items (email_id, line_no, name, line_total, category, category_source, transaction_v2_id) VALUES ('m3', 1, 'Latte', -20, 'Groceries', 'learned', ?)").run(keep);
+    db.query("UPDATE transaction_items SET category = 'Dining', category_source = 'user' WHERE transaction_v2_id = ?").run(dup);
+    applyRelinkPlan(db, planRelink(db, { prefix: P, seen: latestFeed(db, P) }), "2026-10-05");
+    expect(count("SELECT COUNT(*) n FROM transaction_items WHERE transaction_v2_id = ? AND category = 'Dining' AND email_id = 'm3'", keep)).toBe(1);
+  });
+
   test("only the reviewed aliases are planned", () => {
     expect(planRelink(db, { prefix: P, seen: latestFeed(db, P), only: new Set(["x"]) }).pairs).toEqual([]);
   });

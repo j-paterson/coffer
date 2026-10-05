@@ -1,3 +1,4 @@
+import { localIsoDate } from "../lib/format";
 import { useState } from "react";
 
 interface Props {
@@ -8,7 +9,7 @@ interface Props {
   onCancel: () => void;
 }
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayISO = () => localIsoDate();
 
 export function AccountBalanceModal({ accountName, liability, pending, onSubmit, onCancel }: Props) {
   const [balanceText, setBalanceText] = useState("");

@@ -40,8 +40,13 @@ export function attachReceipts(ctx: Ctx, txns: TransactionRow[]): void {
              CAST(transaction_v2_id AS TEXT) AS transaction_id,
              name, short_name, quantity, unit_price,
              line_total, category, subcategory
-      FROM transaction_items
+      FROM transaction_items ti
       WHERE transaction_v2_id IN (${placeholders})
+        -- A receipt-itemized txn keeps the user's category on a zeroed
+        -- synthesized item (see pipeline receipt_items.py); not a real line.
+        AND NOT (email_id IS NULL AND line_total = 0 AND EXISTS (
+          SELECT 1 FROM transaction_items r
+          WHERE r.transaction_v2_id = ti.transaction_v2_id AND r.email_id IS NOT NULL))
       ORDER BY transaction_v2_id, line_no
       `,
     )

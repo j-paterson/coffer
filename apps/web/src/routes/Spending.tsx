@@ -1,3 +1,4 @@
+import { localIsoDate } from "../lib/format";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CategoryDropdown } from "../components/CategoryDropdown";
@@ -56,7 +57,7 @@ const RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
 
 function resolveRange(r: TimeRange): { from?: string; to?: string } {
   const today = new Date();
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const iso = localIsoDate;
   if (r === "month") {
     const start = new Date(today.getFullYear(), today.getMonth(), 1);
     return { from: iso(start), to: iso(today) };

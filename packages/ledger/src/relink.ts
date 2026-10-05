@@ -241,9 +241,9 @@ export function applyRelinkPlan(db: Database, plan: RelinkPlan, today: string): 
                (SELECT excluded_from_spending FROM transactions_v2 WHERE id = ?1))
            WHERE id = ?2`,
         ).run(d.txn_id, d.keeper_txn_id);
-        // Line items: receipt items the keeper lacks move over; every txn
-        // also has one synthesized item, and a category the user set on the
-        // duplicate's wins over an automatic one on the keeper's.
+        // Line items: receipt items the keeper lacks move over. A category the
+        // user set on the duplicate's synthesized item wins over an automatic
+        // one on the keeper's synthesized item (or its receipt lines).
         db.query(
           `UPDATE transaction_items SET transaction_v2_id = ?1
            WHERE transaction_v2_id = ?2 AND email_id IS NOT NULL
@@ -257,9 +257,12 @@ export function applyRelinkPlan(db: Database, plan: RelinkPlan, today: string): 
            FROM (SELECT * FROM transaction_items
                  WHERE transaction_v2_id = ?2 AND email_id IS NULL AND category_source = 'user'
                  ORDER BY line_no LIMIT 1) AS u
-           WHERE k.id = (SELECT id FROM transaction_items
-                         WHERE transaction_v2_id = ?1 AND email_id IS NULL ORDER BY line_no LIMIT 1)
-             AND k.category_source IS NOT 'user'`,
+           WHERE k.transaction_v2_id = ?1 AND k.category_source IS NOT 'user'
+             AND (k.id = (SELECT id FROM transaction_items
+                          WHERE transaction_v2_id = ?1 AND email_id IS NULL ORDER BY line_no LIMIT 1)
+                  -- a receipt-itemized keeper has no placeholder: the receipt lines take it
+                  OR NOT EXISTS (SELECT 1 FROM transaction_items
+                                 WHERE transaction_v2_id = ?1 AND email_id IS NULL))`,
         ).run(d.keeper_txn_id, d.txn_id);
         db.query(`DELETE FROM transaction_items WHERE transaction_v2_id = ?`).run(d.txn_id);
         db.query(`DELETE FROM transactions_v2 WHERE id = ?`).run(d.txn_id); // postings + links cascade

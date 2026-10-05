@@ -48,6 +48,7 @@ export async function runPostSyncHooks(trigger: TriggerKind): Promise<HookResult
 
   results.push(await runStep("reconcile:dedup", ["reconcile", "dedup"]));
   results.push(await runStep("reconcile:transfers", ["reconcile", "transfers"]));
+  results.push(await runStep("reconcile:items", ["reconcile", "items"]));
   results.push(await runStep("categorize", ["categorize", "--uncategorized"]));
 
   if (trigger === "simplefin") {

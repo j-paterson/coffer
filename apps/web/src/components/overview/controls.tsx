@@ -1,5 +1,6 @@
 /** Segmented-control bits used by the Overview page. */
 
+import { localIsoDate } from "../../lib/format";
 import type { Granularity } from "../../../../../packages/shared/types";
 
 export type { Granularity };
@@ -31,7 +32,7 @@ const GRANULARITY_OPTIONS: { value: Granularity; label: string }[] = [
 export function rangeStart(range: TimeRange): string | null {
   if (range === "all") return null;
   const today = new Date();
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const iso = localIsoDate;
   if (range === "ytd") return `${today.getFullYear()}-01-01`;
   const d = new Date(today);
   if (range === "1m") d.setMonth(today.getMonth() - 1);

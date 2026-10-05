@@ -323,6 +323,8 @@ const STOP_WORDS = new Set([
   "free", "new", "best", "pro", "ultra", "super", "max", "plus",
   // Sizing
   "small", "medium", "large", "xl", "xxl",
+  // Bank memo noise ("Online Transfer ... transaction#: 123")
+  "online", "transaction",
 ]);
 
 // Strip per-row noise from a transaction description so two transactions
