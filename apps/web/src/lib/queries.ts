@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-query";
 import type { DebtStrategy } from "../../../../packages/shared/types";
 import { api, type CategoryOption } from "./api";
+import { runSyncAll, type SyncAllOutcome } from "./syncAll";
 
 // String constants so invalidation and tests can reference by name.
 export const queryKeys = {
@@ -503,14 +504,6 @@ export function useSyncCoinbase() {
   return useMutation({ mutationFn: (_: void) => api.syncCoinbase() });
 }
 
-// Order matters: SimpleFIN runs first so downstream parsers can reference
-// the bank/card accounts it discovers. Price providers (defillama,
-// geckoterminal) run after balance providers (zerion, alchemy, coinbase)
-// so positions exist before prices are written. Do not reorder without
-// understanding these dependencies.
-const SYNC_ALL_ORDER = ["simplefin", "defillama", "zerion", "alchemy", "geckoterminal", "coinbase"] as const;
-type ParserId = (typeof SYNC_ALL_ORDER)[number];
-
 async function waitForRunFinish(runId: string, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -526,28 +519,18 @@ async function waitForRunFinish(runId: string, timeoutMs: number): Promise<void>
 export function useSyncAllSequential() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (): Promise<{ completed: ParserId[]; failedAt: ParserId | null }> => {
-      const completed: ParserId[] = [];
-      const SYNC_FNS: Record<ParserId, () => Promise<{ run_id: string }>> = {
-        simplefin: () => api.syncSimpleFIN(),
-        defillama: () => api.syncDefillama(),
-        zerion: () => api.syncZerion(),
-        alchemy: () => api.syncAlchemy(),
-        geckoterminal: () => api.syncGeckoterminal(),
-        coinbase: () => api.syncCoinbase(),
-      };
-      for (const id of SYNC_ALL_ORDER) {
-        let body: { run_id: string };
-        try {
-          body = await SYNC_FNS[id]();
-        } catch {
-          return { completed, failedAt: id };
-        }
-        await waitForRunFinish(body.run_id, 600_000);
-        completed.push(id);
-      }
-      return { completed, failedAt: null };
-    },
+    mutationFn: (): Promise<SyncAllOutcome> =>
+      runSyncAll(
+        {
+          simplefin: () => api.syncSimpleFIN(),
+          defillama: () => api.syncDefillama(),
+          zerion: () => api.syncZerion(),
+          alchemy: () => api.syncAlchemy(),
+          geckoterminal: () => api.syncGeckoterminal(),
+          coinbase: () => api.syncCoinbase(),
+        },
+        (runId) => waitForRunFinish(runId, 600_000),
+      ),
     onSuccess: () => {
       qc.invalidateQueries();
     },

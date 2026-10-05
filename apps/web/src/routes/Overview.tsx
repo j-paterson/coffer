@@ -3,7 +3,8 @@ import {
   ACCOUNT_TYPE_LABELS as TYPE_LABELS,
   ACCOUNT_TYPE_ORDER as TYPE_ORDER,
 } from "../../../../packages/shared/types";
-import type { Account } from "../lib/api";
+import { SyncTriggerError, type Account } from "../lib/api";
+import { describeSyncAll, retryClock } from "../lib/syncAll";
 import { formatDate } from "../lib/format";
 import { LineChart, type Series } from "../lib/LineChart";
 import { StackedSnapshotChart } from "../lib/StackedSnapshotChart";
@@ -199,6 +200,27 @@ export function Overview() {
   const syncGeckoterminalMut = useSyncGeckoterminal();
   const syncCoinbaseMut = useSyncCoinbase();
   const syncAllMut = useSyncAllSequential();
+  // Surface refusals (cooldowns, conflicts) instead of failing silently.
+  const syncNotice = [
+    syncAllMut.data ? describeSyncAll(syncAllMut.data) : null,
+    ...[
+      ["SimpleFIN", syncSimpleFINMut.error],
+      ["Zerion", syncZerionMut.error],
+      ["DefiLlama", syncDefillamaMut.error],
+      ["Alchemy", syncAlchemyMut.error],
+      ["GeckoTerminal", syncGeckoterminalMut.error],
+      ["Coinbase", syncCoinbaseMut.error],
+    ].map(([label, err]) => {
+      if (!(err instanceof Error)) return null;
+      if (err instanceof SyncTriggerError && err.status === 429) {
+        const at = retryClock(err.retryAfterSeconds);
+        return `${label} on cooldown${at ? ` until ${at}` : ""}`;
+      }
+      return `${label} failed: ${err.message}`;
+    }),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const grouped = useMemo(() => {
     if (!accounts) return null;
@@ -664,6 +686,11 @@ export function Overview() {
           + Add account
         </button>
         <div className="flex items-center gap-4">
+          {syncNotice && (
+            <span data-testid="sync-notice" className="text-xs text-amber-700">
+              {syncNotice}
+            </span>
+          )}
           <label className="flex items-center gap-2 text-sm text-stone-600">
             <input
               type="checkbox"
@@ -677,8 +704,13 @@ export function Overview() {
             <button
               type="button"
               data-testid="sync-all-btn"
-              onClick={() => syncAllMut.mutate()}
-              disabled={running}
+              onClick={() => {
+                // Clear stale single-parser notices; sync all reports its own.
+                for (const m of [syncSimpleFINMut, syncZerionMut, syncDefillamaMut,
+                  syncAlchemyMut, syncGeckoterminalMut, syncCoinbaseMut]) m.reset();
+                syncAllMut.mutate();
+              }}
+              disabled={running || syncAllMut.isPending}
               className="flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
               title="Pull latest data from every parser, sequentially"
             >

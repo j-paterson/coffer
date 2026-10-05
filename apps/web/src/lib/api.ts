@@ -91,6 +91,35 @@ async function get<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** A sync trigger the server refused. Carries the server's reason so the UI
+ *  can show it, plus the cooldown wait when the refusal is a 429. */
+export class SyncTriggerError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly retryAfterSeconds: number | null,
+  ) {
+    super(message);
+    this.name = "SyncTriggerError";
+  }
+}
+
+async function triggerSync(path: string): Promise<SyncTriggerResponse> {
+  const res = await fetch(path, { method: "POST" });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      retry_after_seconds?: number;
+    };
+    throw new SyncTriggerError(
+      body.error ?? `${res.status} ${res.statusText}`,
+      res.status,
+      body.retry_after_seconds ?? null,
+    );
+  }
+  return res.json();
+}
+
 export const api = {
   connections: () => get<ProviderConnection[]>("/api/connections"),
   connectProvider: async (id: string, fields: Record<string, string>) => {
@@ -333,36 +362,12 @@ export const api = {
     return res.json();
   },
   advisorModel: () => get<{ model: string }>("/api/advisor/model"),
-  syncSimpleFIN: async (days = 365): Promise<SyncTriggerResponse> => {
-    const res = await fetch(`/api/sync/simplefin?days=${days}`, { method: "POST" });
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    return res.json();
-  },
-  syncZerion: async (): Promise<SyncTriggerResponse> => {
-    const res = await fetch("/api/sync/zerion", { method: "POST" });
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    return res.json();
-  },
-  syncDefillama: async (): Promise<SyncTriggerResponse> => {
-    const res = await fetch("/api/sync/defillama", { method: "POST" });
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    return res.json();
-  },
-  syncAlchemy: async (): Promise<SyncTriggerResponse> => {
-    const res = await fetch("/api/sync/alchemy", { method: "POST" });
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    return res.json();
-  },
-  syncGeckoterminal: async (): Promise<SyncTriggerResponse> => {
-    const res = await fetch("/api/sync/geckoterminal", { method: "POST" });
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    return res.json();
-  },
-  syncCoinbase: async (): Promise<SyncTriggerResponse> => {
-    const res = await fetch("/api/sync/coinbase", { method: "POST" });
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-    return res.json();
-  },
+  syncSimpleFIN: (days = 365) => triggerSync(`/api/sync/simplefin?days=${days}`),
+  syncZerion: () => triggerSync("/api/sync/zerion"),
+  syncDefillama: () => triggerSync("/api/sync/defillama"),
+  syncAlchemy: () => triggerSync("/api/sync/alchemy"),
+  syncGeckoterminal: () => triggerSync("/api/sync/geckoterminal"),
+  syncCoinbase: () => triggerSync("/api/sync/coinbase"),
   bundles: (type?: BundleType) => {
     const q = type ? `?type=${type}` : "";
     return get<Omit<Bundle, "category_options">[]>(`/api/bundles${q}`);

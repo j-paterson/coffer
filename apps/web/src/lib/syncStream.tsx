@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { SyncEvent } from "../../../../packages/shared/types";
+import type { SyncEvent, SyncRunSnapshot } from "../../../../packages/shared/types";
 
 export const MAX_LOG_LINES = 50;
 export const MAX_EVENTS = 500;
@@ -31,7 +31,13 @@ export const initialState: SyncStreamState = {
   events: [],
 };
 
-type Action = { type: "event"; event: SyncEvent };
+// "snapshot" reconciles with the server's view after the stream (re)connects.
+// EventSource auto-reconnects but the server doesn't replay missed events, so
+// a sync_finished dropped during a disconnect would otherwise leave
+// `running` stuck true (and every sync button disabled) until a reload.
+type Action =
+  | { type: "event"; event: SyncEvent }
+  | { type: "snapshot"; current: SyncRunSnapshot["current"] };
 
 function appendEvent(events: SyncEvent[], e: SyncEvent): SyncEvent[] {
   const next = events.length >= MAX_EVENTS ? events.slice(1) : events.slice();
@@ -40,7 +46,16 @@ function appendEvent(events: SyncEvent[], e: SyncEvent): SyncEvent[] {
 }
 
 export function reducer(state: SyncStreamState, action: Action): SyncStreamState {
-  if (action.type !== "event") return state;
+  if (action.type === "snapshot") {
+    const cur = action.current;
+    // Nothing running server-side: clear a stale `running`, keep the log.
+    if (!cur || cur.finished_at) return state.running ? { ...state, running: false } : state;
+    // A run is in flight: rebuild from its full event history.
+    return cur.events.reduce<SyncStreamState>(
+      (s, event) => reducer(s, { type: "event", event }),
+      { ...initialState, run_id: cur.run_id, running: true },
+    );
+  }
   const e = action.event;
   switch (e.type) {
     case "sync_started":
@@ -99,6 +114,22 @@ export function SyncStreamProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const es = new EventSource("/api/sync/stream");
+    let wasRunning = false;
+    es.onopen = () => {
+      fetch("/api/sync/runs")
+        .then((r) => (r.ok ? (r.json() as Promise<SyncRunSnapshot>) : null))
+        .then((snap) => {
+          if (!snap) return;
+          dispatch({ type: "snapshot", current: snap.current });
+          const nowRunning = !!snap.current && !snap.current.finished_at;
+          // A run finished while we were disconnected: refresh stale data.
+          if (wasRunning && !nowRunning) queryClient.invalidateQueries();
+          wasRunning = nowRunning;
+        })
+        .catch(() => {
+          // Server unreachable — the next reconnect retries.
+        });
+    };
     es.onmessage = (msg) => {
       let event: SyncEvent;
       try {
@@ -109,7 +140,9 @@ export function SyncStreamProvider({ children }: { children: ReactNode }) {
         return;
       }
       dispatch({ type: "event", event });
+      if (event.type === "sync_started") wasRunning = true;
       if (event.type === "sync_finished") {
+        wasRunning = false;
         queryClient.invalidateQueries();
       }
     };

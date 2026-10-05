@@ -110,3 +110,53 @@ describe("syncStream reducer", () => {
     expect(s.run_id).toBe("r2");
   });
 });
+
+describe("syncStream reducer — snapshot reconcile", () => {
+  const run = (over: Record<string, unknown> = {}) => ({
+    run_id: "r1",
+    started_at: "2026-04-27T00:00:00Z",
+    finished_at: null,
+    ok: null,
+    events: [] as SyncEvent[],
+    ...over,
+  }) as any;
+
+  test("clears a stuck running flag when the server has no current run", () => {
+    // sync_started arrived, then the stream dropped before sync_finished.
+    const stuck = reducer(initialState, {
+      type: "event",
+      event: evt({ type: "sync_started", sources: ["simplefin"] } as any),
+    });
+    expect(stuck.running).toBe(true);
+    const s = reducer(stuck, { type: "snapshot", current: null });
+    expect(s.running).toBe(false);
+    expect(s.events.length).toBe(1); // log kept
+  });
+
+  test("clears running when the current run has already finished", () => {
+    const stuck = { ...initialState, run_id: "r1", running: true };
+    const s = reducer(stuck, { type: "snapshot", current: run({ finished_at: "2026-04-27T00:01:00Z", ok: true }) });
+    expect(s.running).toBe(false);
+  });
+
+  test("rebuilds state from an in-flight run's events", () => {
+    const s = reducer(initialState, {
+      type: "snapshot",
+      current: run({
+        run_id: "r9",
+        events: [
+          evt({ type: "sync_started", run_id: "r9", sources: ["simplefin"] } as any),
+          evt({ type: "account_started", run_id: "r9", account_id: "ACT-1", source: "simplefin" } as any),
+        ],
+      }),
+    });
+    expect(s.running).toBe(true);
+    expect(s.run_id).toBe("r9");
+    expect(s.accounts["ACT-1"].state).toBe("active");
+    expect(s.events.length).toBe(2);
+  });
+
+  test("is a no-op when idle and nothing is running", () => {
+    expect(reducer(initialState, { type: "snapshot", current: null })).toBe(initialState);
+  });
+});
