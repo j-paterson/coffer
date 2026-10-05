@@ -510,6 +510,25 @@ export type SyncRunSnapshot = {
   history: SyncRunSummary[];
 };
 
+/** One parser's fate in a server-side sync-all chain. "skipped" means a
+ *  cooldown refused it (expected, not an error). */
+export type SyncAllStep = {
+  id: "simplefin" | "defillama" | "zerion" | "alchemy" | "geckoterminal" | "coinbase";
+  status: "pending" | "running" | "completed" | "skipped" | "failed";
+  run_id?: string;
+  /** When a skipped parser's cooldown ends (ISO timestamp). */
+  retry_at?: string;
+  message?: string;
+};
+
+/** GET/POST /api/sync/all — the latest sync-all chain (null if none yet). */
+export type SyncAllState = {
+  id: string;
+  started_at: string;
+  finished_at: string | null;
+  steps: SyncAllStep[];
+};
+
 /** Trigger endpoint response. POST /api/sync/{all,simplefin,zerion}. */
 export type SyncTriggerResponse = { run_id: string };
 

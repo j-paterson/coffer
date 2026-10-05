@@ -11,7 +11,7 @@ import {
 } from "@tanstack/react-query";
 import type { DebtStrategy } from "../../../../packages/shared/types";
 import { api, type CategoryOption } from "./api";
-import { runSyncAll, type SyncAllOutcome } from "./syncAll";
+import { useEffect, useRef } from "react";
 
 // String constants so invalidation and tests can reference by name.
 export const queryKeys = {
@@ -504,37 +504,32 @@ export function useSyncCoinbase() {
   return useMutation({ mutationFn: (_: void) => api.syncCoinbase() });
 }
 
-async function waitForRunFinish(runId: string, timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const r = await fetch("/api/sync/runs");
-    if (!r.ok) throw new Error(`/api/sync/runs ${r.status}`);
-    const snap = await r.json();
-    if (!snap.current || snap.current.run_id !== runId) return;
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  throw new Error(`run ${runId} did not finish within ${timeoutMs}ms`);
-}
-
-export function useSyncAllSequential() {
+/** Server-side sync all. The chain runs on the server, so its progress and
+ *  outcome (including cooldown skips) survive reloads; we poll while it runs
+ *  and refresh every query once it finishes. */
+export function useSyncAll() {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (): Promise<SyncAllOutcome> =>
-      runSyncAll(
-        {
-          simplefin: () => api.syncSimpleFIN(),
-          defillama: () => api.syncDefillama(),
-          zerion: () => api.syncZerion(),
-          alchemy: () => api.syncAlchemy(),
-          geckoterminal: () => api.syncGeckoterminal(),
-          coinbase: () => api.syncCoinbase(),
-        },
-        (runId) => waitForRunFinish(runId, 600_000),
-      ),
-    onSuccess: () => {
-      qc.invalidateQueries();
-    },
+  const q = useQuery({
+    queryKey: ["sync-all"],
+    queryFn: api.syncAllState,
+    refetchInterval: (query) => (query.state.data && !query.state.data.finished_at ? 1500 : false),
   });
+  const start = useMutation({
+    mutationFn: api.startSyncAll,
+    onSuccess: (state) => qc.setQueryData(["sync-all"], state),
+  });
+  const finishedAt = q.data?.finished_at ?? null;
+  const prev = useRef(finishedAt);
+  useEffect(() => {
+    if (prev.current !== finishedAt && finishedAt) void qc.invalidateQueries();
+    prev.current = finishedAt;
+  }, [finishedAt, qc]);
+  return {
+    state: q.data ?? null,
+    start: () => start.mutate(),
+    isRunning: start.isPending || (q.data != null && !q.data.finished_at),
+    error: start.error,
+  };
 }
 
 export function useUpdateBundleCategoryOptions() {

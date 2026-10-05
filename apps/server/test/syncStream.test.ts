@@ -68,17 +68,6 @@ describe("sync streaming", () => {
     syncRuns._finalizeForTest({ exitCode: 0 });
   });
 
-  test("POST /api/sync/all is 404 (route removed)", async () => {
-    const app = new Hono();
-    app.use("*", async (c, next) => {
-      c.set("ctx", createTestCtx());
-      await next();
-    });
-    app.route("/api/sync", syncRoute);
-    const res = await app.request("/api/sync/all", { method: "POST" });
-    expect(res.status).toBe(404);
-  });
-
   test.each([
     ["defillama"],
     ["alchemy"],

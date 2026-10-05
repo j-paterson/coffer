@@ -15,6 +15,10 @@ import { computeViewGroups, membersOfViewGroup } from "../lib/viewGroups";
 import { addDays, todayISO, buildCurrentCohortCte, buildCohortSessionsCte, COHORT_JOIN, walkSeveralCanonicals, breakdownByDate } from "@coffer/ledger/walker";
 import type { Account, Holding } from "../../../../packages/shared/types";
 import { runOperations, type Operation } from "@coffer/ledger/runner";
+import { applyRelinkPlan, latestFeed, planRelink, type RelinkPlan } from "@coffer/ledger";
+import { mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import {
   ACCOUNT_CATEGORIES,
   categoryMeta,
@@ -194,6 +198,59 @@ route.get("/", (c) => {
 // from v2 position_snapshots with source-priority resolution per
 // (position, date) so backfill data only fills gaps where no live
 // observation exists.
+// ── Reconnected-account relinking ────────────────────────────────────────
+// Reconnecting an institution at SimpleFIN mints new account ids. GET shows
+// what would be merged; POST (a user click) backs the DB up, then merges.
+const RELINK_PREFIX = "simplefin:";
+
+function relinkPlan(ctx: Ctx, only?: ReadonlySet<string>): RelinkPlan {
+  const seen = latestFeed(ctx.db, RELINK_PREFIX);
+  if (seen.size === 0) return { pairs: [], ambiguous: [] };
+  return planRelink(ctx.db, { prefix: RELINK_PREFIX, seen, only });
+}
+
+/** Consistent copy of the live DB (VACUUM INTO) next to it in backups/. */
+export function backupDb(ctx: Ctx, label: string): string {
+  const file = ctx.db.filename;
+  const dir = file && file !== ":memory:" ? join(dirname(file), "backups") : join(tmpdir(), "coffer-backups");
+  mkdirSync(dir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const path = join(dir, `finance-${label}-${stamp}.sqlite`);
+  ctx.db.query("VACUUM INTO ?").run(path);
+  return path;
+}
+
+route.get("/relink", (c) => c.json(relinkPlan(c.get("ctx") as Ctx)));
+
+route.post("/relink", async (c) => {
+  const ctx = c.get("ctx") as Ctx;
+  // Merge exactly what the user reviewed: the same pairs and the same number
+  // of deletions. A sync in between may have changed the plan.
+  const body = await c.req
+    .json<{ aliases?: string[]; expected_removed?: number }>()
+    .catch(() => ({ aliases: undefined, expected_removed: undefined }));
+  const reviewed = new Set(body.aliases ?? []);
+  if (reviewed.size === 0 || typeof body.expected_removed !== "number") {
+    return c.json({ error: "aliases and expected_removed required" }, 400);
+  }
+  const { pairs } = relinkPlan(ctx, reviewed);
+  const removing = pairs.reduce((a, p) => a + p.duplicates.length, 0);
+  if (pairs.length !== reviewed.size || removing !== body.expected_removed) {
+    return c.json({ error: "the merge plan changed since you reviewed it — review again" }, 409);
+  }
+  let backup: string;
+  try {
+    backup = backupDb(ctx, "pre-relink");
+  } catch (e) {
+    return c.json({ error: `backup failed, nothing changed: ${(e as Error).message}` }, 500);
+  }
+  applyRelinkPlan(ctx.db, { pairs, ambiguous: [] }, ctx.today);
+  return c.json({
+    backup,
+    merged: pairs.map((p) => ({ canonical: p.canonical, alias: p.alias, removed: p.duplicates.length })),
+  });
+});
+
 route.get("/:id/holdings-history", (c) => {
   const id = c.req.param("id");
   // days=0 (or omitted with explicit ?days=all) returns full history.

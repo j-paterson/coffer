@@ -1,46 +1,9 @@
-import { SyncTriggerError } from "./api";
+import type { SyncAllState, SyncAllStep } from "../../../../packages/shared/types";
 
-// Order matters: SimpleFIN runs first so downstream parsers can reference
-// the bank/card accounts it discovers. Price providers (defillama,
-// geckoterminal) run after balance providers (zerion, alchemy, coinbase)
-// so positions exist before prices are written. Do not reorder without
-// understanding these dependencies.
-export const SYNC_ALL_ORDER = ["simplefin", "defillama", "zerion", "alchemy", "geckoterminal", "coinbase"] as const;
-export type ParserId = (typeof SYNC_ALL_ORDER)[number];
+// The chain itself runs on the server (POST /api/sync/all) so it survives
+// reloads; this module only turns its state into toolbar text.
 
-export type SyncAllOutcome = {
-  completed: ParserId[];
-  /** Refused by a cooldown (HTTP 429). Expected, not an error. */
-  skipped: { id: ParserId; retryAfterSeconds: number | null }[];
-  failed: { id: ParserId; message: string }[];
-};
-
-/** Trigger each parser in order, waiting for each run to finish. A refusal
- *  no longer aborts the chain: a cooldown is recorded as skipped and any
- *  other error as failed, and the remaining parsers still run (each one only
- *  needs accounts already in the ledger, not a fresh sync of the previous). */
-export async function runSyncAll(
-  trigger: Record<ParserId, () => Promise<{ run_id: string }>>,
-  waitForFinish: (runId: string) => Promise<void>,
-): Promise<SyncAllOutcome> {
-  const out: SyncAllOutcome = { completed: [], skipped: [], failed: [] };
-  for (const id of SYNC_ALL_ORDER) {
-    try {
-      const { run_id } = await trigger[id]();
-      await waitForFinish(run_id);
-      out.completed.push(id);
-    } catch (e) {
-      if (e instanceof SyncTriggerError && e.status === 429) {
-        out.skipped.push({ id, retryAfterSeconds: e.retryAfterSeconds });
-      } else {
-        out.failed.push({ id, message: e instanceof Error ? e.message : String(e) });
-      }
-    }
-  }
-  return out;
-}
-
-const PARSER_LABEL: Record<ParserId, string> = {
+const PARSER_LABEL: Record<SyncAllStep["id"], string> = {
   simplefin: "SimpleFIN",
   defillama: "DefiLlama",
   zerion: "Zerion",
@@ -49,22 +12,29 @@ const PARSER_LABEL: Record<ParserId, string> = {
   coinbase: "Coinbase",
 };
 
+const clock = (ms: number) =>
+  new Date(ms).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
 /** "3:04 AM" for a retry-after in seconds, or null when unknown. */
 export function retryClock(retryAfterSeconds: number | null, now = Date.now()): string | null {
-  if (retryAfterSeconds == null) return null;
-  return new Date(now + retryAfterSeconds * 1000).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return retryAfterSeconds == null ? null : clock(now + retryAfterSeconds * 1000);
 }
 
-/** One line for the toolbar, or null when everything ran. */
-export function describeSyncAll(o: SyncAllOutcome, now = Date.now()): string | null {
+/** One line for the toolbar: progress while running, then any skips or
+ *  failures. Null when the last chain ran everything. */
+export function describeSyncAll(s: SyncAllState): string | null {
   const parts: string[] = [];
-  for (const s of o.skipped) {
-    const at = retryClock(s.retryAfterSeconds, now);
-    parts.push(`${PARSER_LABEL[s.id]} skipped (cooldown${at ? ` until ${at}` : ""})`);
+  const running = s.steps.findIndex((x) => x.status === "running");
+  if (!s.finished_at && running >= 0) {
+    parts.push(`Syncing ${PARSER_LABEL[s.steps[running]!.id]} (${running + 1}/${s.steps.length})…`);
   }
-  for (const f of o.failed) parts.push(`${PARSER_LABEL[f.id]} failed: ${f.message}`);
-  return parts.length ? parts.join(" · ") : null;
+  for (const x of s.steps) {
+    if (x.status === "skipped") {
+      parts.push(`${PARSER_LABEL[x.id]} skipped (cooldown${x.retry_at ? ` until ${clock(Date.parse(x.retry_at))}` : ""})`);
+    } else if (x.status === "failed") {
+      parts.push(`${PARSER_LABEL[x.id]} failed: ${x.message ?? "unknown error"}`);
+    }
+  }
+  if (s.finished_at && parts.length) parts.unshift(`Sync all at ${clock(Date.parse(s.started_at))}:`);
+  return parts.length ? parts.join(" · ").replace(": · ", ": ") : null;
 }

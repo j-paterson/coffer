@@ -4,3 +4,4 @@ export * from "./walker";
 export * from "./runner";
 export { LedgerPriceProvider } from "./asset-prices/ledger-price-provider";
 export type { LedgerPriceProviderOpts } from "./asset-prices/ledger-price-provider";
+export * from "./relink";

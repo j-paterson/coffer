@@ -22,7 +22,7 @@ import {
   useSyncAlchemy,
   useSyncGeckoterminal,
   useSyncCoinbase,
-  useSyncAllSequential,
+  useSyncAll,
   useWalletHistory,
   useCreateAccount,
   useUpdateAccountBalance,
@@ -36,6 +36,7 @@ import {
   walletAddressOf,
 } from "../components/overview/rows";
 import { WalletComposition } from "../components/overview/WalletComposition";
+import { RelinkBanner } from "../components/overview/RelinkBanner";
 import {
   ChartPlaceholder,
   GranularitySwitch,
@@ -207,10 +208,11 @@ export function Overview() {
   const syncAlchemyMut = useSyncAlchemy();
   const syncGeckoterminalMut = useSyncGeckoterminal();
   const syncCoinbaseMut = useSyncCoinbase();
-  const syncAllMut = useSyncAllSequential();
+  const syncAll = useSyncAll();
   // Surface refusals (cooldowns, conflicts) instead of failing silently.
   const syncNotice = [
-    syncAllMut.data ? describeSyncAll(syncAllMut.data) : null,
+    syncAll.state ? describeSyncAll(syncAll.state) : null,
+    syncAll.error instanceof Error ? `Sync all failed to start: ${syncAll.error.message}` : null,
     ...[
       ["SimpleFIN", syncSimpleFINMut.error],
       ["Zerion", syncZerionMut.error],
@@ -706,6 +708,8 @@ export function Overview() {
         </div>
       </section>
 
+      <RelinkBanner />
+
       <div className="mb-3 flex items-center justify-between gap-4">
         <button
           type="button"
@@ -737,18 +741,18 @@ export function Overview() {
                 // Clear stale single-parser notices; sync all reports its own.
                 for (const m of [syncSimpleFINMut, syncZerionMut, syncDefillamaMut,
                   syncAlchemyMut, syncGeckoterminalMut, syncCoinbaseMut]) m.reset();
-                syncAllMut.mutate();
+                syncAll.start();
               }}
-              disabled={running || syncAllMut.isPending}
+              disabled={running || syncAll.isRunning}
               className="flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
               title="Pull latest data from every parser, sequentially"
             >
               <span
-                className={running ? "inline-block animate-spin" : "inline-block"}
+                className={running || syncAll.isRunning ? "inline-block animate-spin" : "inline-block"}
               >
                 ⟳
               </span>
-              {running ? "syncing…" : "sync all"}
+              {running || syncAll.isRunning ? "syncing…" : "sync all"}
             </button>
             <button
               type="button"

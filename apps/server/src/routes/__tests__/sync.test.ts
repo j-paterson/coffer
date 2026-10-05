@@ -77,13 +77,6 @@ describe("sync routes — argv assertions", () => {
     await new Promise((r) => setTimeout(r, 5));
   });
 
-  test("POST /api/sync/all returns 404", async () => {
-    const coord = new SyncRunCoordinator();
-    const app = makeApp(coord);
-    const res = await app.request("/api/sync/all", { method: "POST" });
-    expect(res.status).toBe(404);
-  });
-
   test("cross-trigger collision returns 409", async () => {
     const coord = new SyncRunCoordinator();
     // Use a never-resolving exited so the run stays active for the second request.

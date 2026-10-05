@@ -28,6 +28,7 @@ import type {
   SpendingTransactionsResponse,
   SubcategoryRow,
   Summary,
+  SyncAllState,
   SyncTriggerResponse,
   TradeRow,
   TransactionItem,
@@ -64,6 +65,7 @@ export type {
   SpendingTransactionsResponse,
   SubcategoryRow,
   Summary,
+  SyncAllState,
   SyncTriggerResponse,
   TradeRow,
   TransactionItem,
@@ -120,7 +122,26 @@ async function triggerSync(path: string): Promise<SyncTriggerResponse> {
   return res.json();
 }
 
+/** Mirrors @coffer/ledger RelinkPlan (GET /api/accounts/relink). */
+export type RelinkDuplicate = { txn_id: number; keeper_txn_id: number; date: string; description: string | null; amount: number };
+export type RelinkPair = { canonical: string; alias: string; label: string; duplicates: RelinkDuplicate[]; needs_review: RelinkDuplicate[]; unmatched: number };
+export type RelinkPlan = { pairs: RelinkPair[]; ambiguous: string[] };
+export type RelinkResult = { backup: string; merged: { canonical: string; alias: string; removed: number }[] };
+
 export const api = {
+  relinkPlan: () => get<RelinkPlan>("/api/accounts/relink"),
+  applyRelink: async (aliases: string[], expected_removed: number): Promise<RelinkResult> => {
+    const res = await fetch("/api/accounts/relink", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aliases, expected_removed }),
+    });
+    if (!res.ok) {
+      const msg = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(msg.error ?? `${res.status} ${res.statusText}`);
+    }
+    return res.json();
+  },
   connections: () => get<ProviderConnection[]>("/api/connections"),
   connectProvider: async (id: string, fields: Record<string, string>) => {
     const res = await fetch(`/api/connections/${encodeURIComponent(id)}`, {
@@ -362,6 +383,12 @@ export const api = {
     return res.json();
   },
   advisorModel: () => get<{ model: string }>("/api/advisor/model"),
+  syncAllState: () => get<SyncAllState | null>("/api/sync/all"),
+  startSyncAll: async (): Promise<SyncAllState> => {
+    const res = await fetch("/api/sync/all", { method: "POST" });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    return res.json();
+  },
   syncSimpleFIN: (days = 365) => triggerSync(`/api/sync/simplefin?days=${days}`),
   syncZerion: () => triggerSync("/api/sync/zerion"),
   syncDefillama: () => triggerSync("/api/sync/defillama"),

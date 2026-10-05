@@ -57,6 +57,7 @@ export class SyncRunCoordinator {
   private readonly configPath: string;
   private lastFinished = new Map<TriggerKind, { at: number; ok: boolean }>();
   private readonly hooksEnabled: boolean;
+  private finishWaiters = new Map<string, Array<(run: SyncRunSummary) => void>>();
 
   constructor(opts: SyncRunCoordinatorOpts = {}) {
     this.maxEventsPerRun = opts.maxEventsPerRun ?? DEFAULT_MAX_EVENTS_PER_RUN;
@@ -264,12 +265,30 @@ export class SyncRunCoordinator {
     this.history.unshift(summary);
     if (this.history.length > HISTORY_LIMIT) this.history.pop();
     this.current = null;
+    for (const resolve of this.finishWaiters.get(summary.run_id) ?? []) resolve(summary);
+    this.finishWaiters.delete(summary.run_id);
 
     if (ok && wasSpawned && this.hooksEnabled) {
       runPostSyncHooks(trigger).catch((err) =>
         console.error("[syncRuns] post-sync hooks failed:", err),
       );
     }
+  }
+
+  /** Resolves with the finished run (immediately if it already finished). */
+  waitForRun(run_id: string): Promise<SyncRunSummary> {
+    const done = this.history.find((h) => h.run_id === run_id);
+    if (done || this.current?.run_id !== run_id) {
+      return Promise.resolve(done ?? { run_id, started_at: "", finished_at: null, ok: null, events: [] });
+    }
+    return new Promise((resolve) => {
+      this.finishWaiters.set(run_id, [...(this.finishWaiters.get(run_id) ?? []), resolve]);
+    });
+  }
+
+  /** Run id of the sync in progress, if any. */
+  currentRunId(): string | null {
+    return this.current?.run_id ?? null;
   }
 
   cooldownRemaining(trigger: TriggerKind, minIntervalMs: number): number {

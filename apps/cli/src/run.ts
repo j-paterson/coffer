@@ -56,6 +56,15 @@ async function* teeOps(
   }
 }
 
+/** Stamp every account this run returned. Only after a successful run, so a
+ *  failed or partial fetch never makes accounts look like they dropped out. */
+function markSeen(db: Database, ids: Set<string>, at: string): void {
+  const stmt = db.query("UPDATE accounts SET last_seen_at = ? WHERE id = ?");
+  db.transaction(() => {
+    for (const id of ids) stmt.run(at, id);
+  })();
+}
+
 export async function runSync(opts: RunSyncOpts): Promise<RunSyncResult> {
   const registry = opts.registry ?? (DEFAULT_REGISTRY as Record<string, Parser<unknown>>);
   const parser = registry[opts.parserId];
@@ -64,6 +73,8 @@ export async function runSync(opts: RunSyncOpts): Promise<RunSyncResult> {
   const run_id = opts.genRunId();
   let summary: RunSummary = emptySummary();
   let ok = false;
+  const startedAt = opts.now().toISOString();
+  const seenAccounts = new Set<string>();
 
   opts.events.syncStarted({ run_id, sources: [opts.parserId] });
   try {
@@ -81,6 +92,7 @@ export async function runSync(opts: RunSyncOpts): Promise<RunSyncResult> {
       const stream = teeOps(
         parser.sync(ctx),
         (op) => {
+          if (op.kind === "account_discovery") seenAccounts.add(op.draft.id);
           if (op.kind === "sync_warning") {
             opts.events.warning({
               run_id,
@@ -91,6 +103,7 @@ export async function runSync(opts: RunSyncOpts): Promise<RunSyncResult> {
         },
       );
       summary = await runOperations(opts.db, stream);
+      markSeen(opts.db, seenAccounts, startedAt);
       ok = true;
     } finally {
       cache.close();

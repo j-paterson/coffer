@@ -151,6 +151,39 @@ describe("runSync — parser throws mid-stream", () => {
   });
 });
 
+describe("runSync — last_seen_at", () => {
+  const discover = (id: string): Operation => ({
+    kind: "account_discovery",
+    draft: { id, display_name: id, institution: "Northwind Bank", type: "checking", mode: "live" },
+  } as Operation);
+  const run = (db: Database, parser: Parser<z.infer<typeof HAPPY_CONFIG>>, now: Date) =>
+    withTempFd((fd) =>
+      runSync({
+        parserId: "fake", config: { x: 1 }, db, env: NULL_SECRETS,
+        events: makeEventsEmitter(fd), now: () => now, genRunId: () => "run-seen",
+        registry: { fake: parser },
+      }),
+    );
+  const seenAt = (db: Database, id: string) =>
+    (db.query("SELECT last_seen_at FROM accounts WHERE id = ?").get(id) as { last_seen_at: string | null }).last_seen_at;
+
+  test("stamps every returned account with the run start; dropped accounts keep their old stamp", async () => {
+    const db = freshDb();
+    await run(db, fakeParser([discover("fake:a"), discover("fake:b")]), new Date("2026-10-01T00:00:00Z"));
+    await run(db, fakeParser([discover("fake:b")]), new Date("2026-10-05T00:00:00Z"));
+    expect(seenAt(db, "fake:a")).toBe("2026-10-01T00:00:00.000Z");
+    expect(seenAt(db, "fake:b")).toBe("2026-10-05T00:00:00.000Z");
+    db.close();
+  });
+
+  test("a failed run stamps nothing", async () => {
+    const db = freshDb();
+    await expect(run(db, fakeParser([discover("fake:a")], 1), new Date("2026-10-05T00:00:00Z"))).rejects.toThrow("boom");
+    expect(seenAt(db, "fake:a")).toBeNull();
+    db.close();
+  });
+});
+
 describe("runSync — schema outdated rewrap", () => {
   test("SQLITE_ERROR 'no such table' from runOperations gets rewrapped as SchemaOutdatedError", async () => {
     const db = new Database(":memory:");
