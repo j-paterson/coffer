@@ -47,6 +47,8 @@ import {
   type TimeRange,
 } from "../components/overview/controls";
 import { SyncDebugLog } from "../components/overview/SyncDebugLog";
+import { RangeContributors } from "../components/overview/RangeContributors";
+import { rangeContributors } from "../lib/contributors";
 import { AddAccountModal } from "../components/AddAccountModal";
 import { AccountBalanceModal } from "../components/AccountBalanceModal";
 import { isLiabilityType } from "../../../../packages/shared/accountCategory";
@@ -87,6 +89,12 @@ export function Overview() {
   // Reset whenever the underlying data set changes so a stale index can't
   // point past the new array.
   const [chartHoverIdx, setChartHoverIdx] = useState<number | null>(null);
+  // Range dragged on the Net/Split chart. Tagged with the view it was made
+  // in so switching range, granularity or mode drops it (the chart remounts
+  // via the same key and forgets its selection too).
+  const [dragged, setDragged] = useState<
+    { startDate: string; endDate: string; view: string } | null
+  >(null);
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showBalanceModal, setShowBalanceModal] = useState(false);
   const createAccount = useCreateAccount();
@@ -132,7 +140,7 @@ export function Overview() {
   const seriesQ = useNetWorthSeries(granularity);
   const breakdownQ = useNetWorthBreakdown(
     granularity,
-    mode === "breakdown" && !selectedId,
+    (mode === "breakdown" || dragged != null) && !selectedId,
   );
   // 0 = full history. Per-account chart shows the same range the
   // net-worth chart aggregates from this account — no artificial cap.
@@ -310,6 +318,16 @@ export function Overview() {
       },
     ];
   }, [filteredAccountSnaps, selectedAccount, privacyOn]);
+
+  const chartView = `${range}|${granularity}|${mode}|${selectedId ?? ""}`;
+  const netRange = dragged?.view === chartView ? dragged : null;
+  const contributors = useMemo(
+    () =>
+      netRange && privateBreakdownSnaps
+        ? rangeContributors(privateBreakdownSnaps, netRange.startDate, netRange.endDate)
+        : null,
+    [netRange, privateBreakdownSnaps],
+  );
 
   const series: Series[] = useMemo(() => {
     const points = filteredPoints;
@@ -619,15 +637,26 @@ export function Overview() {
               />
             ) : (
               <LineChart
+                key={chartView}
                 series={series}
                 width={720}
                 height={mode === "split" ? 320 : 260}
                 formatY={(n) => fmt.amount(n)}
                 showTooltip={false}
                 onHoverIndexChange={setChartHoverIdx}
+                onRangeSelect={(r) => setDragged(r && { ...r, view: chartView })}
               />
             )}
           </div>
+          {netRange && (
+            <RangeContributors
+              startDate={netRange.startDate}
+              endDate={netRange.endDate}
+              result={contributors}
+              loading={breakdownQ.isLoading}
+              formatAmount={(n) => fmt.amount(n)}
+            />
+          )}
           {selectedAccount && selectedAccount.mode === "manual" && (
             <div className="mt-3 flex items-center gap-2">
               <button
